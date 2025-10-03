@@ -13,11 +13,13 @@ Un sistema completo de seguimiento de hábitos construido con Django REST Framew
 ## Tecnologías Utilizadas
 
 ### Backend
+
 - Django REST Framework
 - Python 3.11
 - SQLite (base de datos)
 
 ### Frontend
+
 - React
 - JavaScript/JSX
 - CSS3
@@ -38,27 +40,32 @@ habit-tracker/
 ### Backend (Django)
 
 1. Crear y activar un entorno virtual:
+
 ```bash
 python -m venv venv
 source venv/bin/activate  # En Windows: venv\Scripts\activate
 ```
 
 2. Instalar dependencias:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 3. Ejecutar migraciones:
+
 ```bash
 python manage.py migrate
 ```
 
 4. Crear superusuario (opcional):
+
 ```bash
 python manage.py createsuperuser
 ```
 
 5. Ejecutar el servidor de desarrollo:
+
 ```bash
 python manage.py runserver
 ```
@@ -68,16 +75,19 @@ El backend estará disponible en `http://localhost:8000/`
 ### Frontend (React)
 
 1. Navegar al directorio del frontend:
+
 ```bash
 cd habit-tracker-frontend
 ```
 
 2. Instalar dependencias:
+
 ```bash
 npm install
 ```
 
 3. Ejecutar la aplicación:
+
 ```bash
 npm start
 ```
