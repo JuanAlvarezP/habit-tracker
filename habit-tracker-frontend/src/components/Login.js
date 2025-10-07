@@ -38,7 +38,7 @@ const Login = ({ setAuthToken }) => {
   };
 
   return (
-    <div className="bg-background-light dark:bg-background-dark font-display">
+    <div className="bg-background-dark font-display">
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <div className="w-full max-w-md">
           <div className="flex justify-center mb-6">
@@ -54,14 +54,14 @@ const Login = ({ setAuthToken }) => {
                   fill="currentColor"
                 />
               </svg>
-              <h1 className="text-2xl font-bold text-foreground-light dark:text-foreground-dark">
+              <h1 className="text-2xl font-bold text-foreground-dark">
                 Habit Tracker
               </h1>
             </div>
           </div>
 
-          <div className="bg-card-light dark:bg-card-dark p-8 rounded-lg shadow-md">
-            <h2 className="text-2xl font-bold text-center text-foreground-light dark:text-foreground-dark mb-6">
+          <div className="bg-card-dark p-8 rounded-lg shadow-md">
+            <h2 className="text-2xl font-bold text-center text-foreground-dark mb-6">
               Iniciar sesión
             </h2>
 
@@ -74,7 +74,7 @@ const Login = ({ setAuthToken }) => {
             <form onSubmit={handleLogin} className="space-y-6">
               <div>
                 <label
-                  className="block text-sm font-medium text-subtle-light dark:text-subtle-dark"
+                  className="block text-sm font-medium text-subtle-dark"
                   htmlFor="username"
                 >
                   Nombre de usuario
@@ -87,7 +87,7 @@ const Login = ({ setAuthToken }) => {
                     required
                     value={formData.username}
                     onChange={handleChange}
-                    className="form-input w-full px-4 py-3 rounded-DEFAULT bg-background-light dark:bg-background-dark border border-input-light dark:border-input-dark text-foreground-light dark:text-foreground-dark placeholder-subtle-light dark:placeholder-subtle-dark focus:ring-primary focus:border-primary"
+                    className="form-input w-full px-4 py-3 rounded-DEFAULT bg-background-dark border border-input-dark text-foreground-dark placeholder-subtle-dark focus:ring-primary focus:border-primary"
                     placeholder="Ingresa tu nombre de usuario"
                   />
                 </div>
@@ -95,7 +95,7 @@ const Login = ({ setAuthToken }) => {
 
               <div>
                 <label
-                  className="block text-sm font-medium text-subtle-light dark:text-subtle-dark"
+                  className="block text-sm font-medium text-subtle-dark"
                   htmlFor="password"
                 >
                   Contraseña
@@ -108,7 +108,7 @@ const Login = ({ setAuthToken }) => {
                     required
                     value={formData.password}
                     onChange={handleChange}
-                    className="form-input w-full px-4 py-3 rounded-DEFAULT bg-background-light dark:bg-background-dark border border-input-light dark:border-input-dark text-foreground-light dark:text-foreground-dark placeholder-subtle-light dark:placeholder-subtle-dark focus:ring-primary focus:border-primary"
+                    className="form-input w-full px-4 py-3 rounded-DEFAULT bg-background-dark border border-input-dark text-foreground-dark placeholder-subtle-dark focus:ring-primary focus:border-primary"
                     placeholder="Ingresa tu contraseña"
                   />
                 </div>
@@ -124,7 +124,7 @@ const Login = ({ setAuthToken }) => {
               </div>
             </form>
 
-            <p className="mt-6 text-center text-sm text-subtle-light dark:text-subtle-dark">
+            <p className="mt-6 text-center text-sm text-subtle-dark">
               ¿No tienes una cuenta?{" "}
               <Link
                 to="/register"

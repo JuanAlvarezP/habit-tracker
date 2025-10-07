@@ -7,7 +7,12 @@ class Habit(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    frequency = models.CharField(max_length=50)  # e.g., daily, weekly
+    FREQUENCY_CHOICES = [
+        ('Diaria', 'Diaria'),
+        ('Semanal', 'Semanal'),
+        ('Mensual', 'Mensual'),
+    ]
+    frequency = models.CharField(max_length=50, choices=FREQUENCY_CHOICES, default='Diaria')
     reminder_time = models.TimeField(null=True, blank=True)
 
     def __str__(self):

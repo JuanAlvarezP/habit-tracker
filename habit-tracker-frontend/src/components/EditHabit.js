@@ -1,37 +1,74 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import "./CreateHabit.css";
 
-const CreateHabit = () => {
+const EditHabit = () => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [frequency, setFrequency] = useState("Diaria");
   const [reminderTime, setReminderTime] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { id } = useParams();
+
+  useEffect(() => {
+    const fetchHabit = async () => {
+      const authToken = localStorage.getItem("authToken");
+      if (!authToken) {
+        navigate("/login");
+        return;
+      }
+
+      try {
+        const response = await axios.get(
+          `http://localhost:8000/api/habits/${id}/`,
+          {
+            headers: {
+              Authorization: `Token ${authToken}`,
+            },
+          }
+        );
+        const habit = response.data;
+        setName(habit.name);
+        setDescription(habit.description || "");
+        setFrequency(habit.frequency);
+        setReminderTime(habit.reminder_time || "");
+        setLoading(false);
+      } catch (err) {
+        console.error("Error fetching habit:", err);
+        setError("No se pudo cargar el hábito.");
+        setLoading(false);
+        if (err.response && err.response.status === 404) {
+          navigate("/habits");
+        }
+      }
+    };
+
+    fetchHabit();
+  }, [id, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
 
-    // Obtener el token de autenticación del almacenamiento local
     const authToken = localStorage.getItem("authToken");
     if (!authToken) {
-      setError("You must be logged in to create a habit.");
+      setError("Debes iniciar sesión para editar un hábito.");
       return;
     }
 
     try {
-      const response = await axios.post(
-        "http://localhost:8000/api/habits/",
+      await axios.put(
+        `http://localhost:8000/api/habits/${id}/`,
         {
           name,
           description,
           frequency,
-          reminder_time: reminderTime || null, // Envía null si el campo está vacío
+          reminder_time: reminderTime || null,
         },
         {
           headers: {
@@ -39,23 +76,25 @@ const CreateHabit = () => {
           },
         }
       );
-      setSuccess("Habit created successfully!");
-      console.log("Habit created:", response.data);
-      setName("");
-      setDescription("");
-      setFrequency("Diaria");
-      setReminderTime("");
-      navigate("/habits"); // Redirige a la lista de hábitos
+      setSuccess("¡Hábito actualizado exitosamente!");
+      setTimeout(() => navigate("/habits"), 1500);
     } catch (err) {
       if (err.response && err.response.data) {
-        // Muestra un error específico de la API si existe
         setError(Object.values(err.response.data)[0][0]);
       } else {
-        setError("An unexpected error occurred. Please try again.");
+        setError("Ocurrió un error inesperado. Por favor, intenta de nuevo.");
       }
       console.error(err);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-background-dark text-content-dark">
+        <p>Cargando hábito...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background-dark text-content-dark">
@@ -99,10 +138,10 @@ const CreateHabit = () => {
         <div className="w-full max-w-md space-y-8">
           <div>
             <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-white">
-              Crear un nuevo hábito
+              Editar hábito
             </h2>
             <p className="mt-2 text-center text-sm text-content-dark text-gray-400">
-              Construye una mejor versión de ti, un hábito a la vez.
+              Actualiza tu hábito para mantenerlo relevante.
             </p>
           </div>
 
@@ -185,6 +224,7 @@ const CreateHabit = () => {
                 </div>
               </div>
             </div>
+
             <div className="flex items-center justify-between gap-4 pt-4">
               <button
                 type="button"
@@ -197,7 +237,7 @@ const CreateHabit = () => {
                 type="submit"
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:ring-offset-background-dark"
               >
-                Guardar Hábito
+                Guardar Cambios
               </button>
             </div>
           </form>
@@ -207,4 +247,4 @@ const CreateHabit = () => {
   );
 };
 
-export default CreateHabit;
+export default EditHabit;
