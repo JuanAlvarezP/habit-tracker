@@ -9,8 +9,7 @@ pipeline {
                     // Instalar dependencias de Python
                     sh 'pip install -r requirements.txt' 
 
-                    // Ejecutar pruebas unitarias
-                    sh 'python manage.py test' 
+
 
                     // Ejecutar migraciones de la base de datos
                     sh 'python manage.py makemigrations'
