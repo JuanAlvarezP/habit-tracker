@@ -13,7 +13,7 @@ pipeline {
                 sh 'python manage.py migrate'
                 
                 // Iniciar servidor Django en background
-                sh 'nohup python manage.py runserver 0.0.0.0:8000 &'
+                sh 'python manage.py runserver 0.0.0.0:8000 &'
                 echo 'El backend está corriendo en el puerto 8000.'
             }
         }
@@ -29,7 +29,7 @@ pipeline {
                     sh 'npm install'
                     
                     // Iniciar servidor React en background
-                    sh 'nohup npm start &'
+                    sh 'npm start &'
                     echo 'El frontend está corriendo en el puerto 3000.'
                 }
             }
