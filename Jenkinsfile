@@ -5,17 +5,16 @@ pipeline {
         stage('Backend CI/CD') {
             steps {
                 echo 'Iniciando el pipeline para el backend de Django...'
-                dir('habit_tracker_backend') {
-                    // Instalar dependencias de Python
-                    sh 'pip install -r requirements.txt' 
+                // Instalar dependencias de Python
+                sh 'pip install -r requirements.txt' 
 
-
-
-                    // Ejecutar migraciones de la base de datos
-                    sh 'python manage.py makemigrations'
-                    sh 'python manage.py migrate'
-                    echo 'El backend está listo.'
-                }
+                // Ejecutar migraciones de la base de datos
+                sh 'python manage.py makemigrations'
+                sh 'python manage.py migrate'
+                
+                // Iniciar servidor Django en background
+                sh 'nohup python manage.py runserver 0.0.0.0:8000 &'
+                echo 'El backend está corriendo en el puerto 8000.'
             }
         }
 
@@ -28,9 +27,10 @@ pipeline {
                 dir('habit-tracker-frontend') {
                     // Instalar dependencias de Node.js
                     sh 'npm install'
-                    // Compilar la aplicación para producción
-                    sh 'npm start' 
-                    echo 'El frontend está compilado y listo para ser servido.'
+                    
+                    // Iniciar servidor React en background
+                    sh 'nohup npm start &'
+                    echo 'El frontend está corriendo en el puerto 3000.'
                 }
             }
         }
