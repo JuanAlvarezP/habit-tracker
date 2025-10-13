@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import HabitCard from "./HabitCard";
+import Navbar from "./Navbar";
 
 const HomePage = () => {
   const [habits, setHabits] = useState([]);
@@ -48,10 +49,16 @@ const HomePage = () => {
     );
   }
 
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    navigate("/login");
+  };
+
   return (
-    <div className="min-h-screen bg-background-dark">
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-background-dark rounded-lg p-6">
+    <div className="flex flex-col min-h-screen w-full bg-background-dark">
+      <Navbar handleLogout={handleLogout} />
+      <main className="flex-1 w-full">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-2xl font-bold text-content-dark text-white">
               Mis Hábitos

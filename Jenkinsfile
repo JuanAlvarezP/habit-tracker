@@ -5,7 +5,7 @@ pipeline {
         stage('Backend CI/CD') {
             steps {
                 echo 'Iniciando el pipeline para el backend de Django...'
-                dir('backend') {
+                dir('habit_tracker_backend') {
                     // Instalar dependencias de Python
                     sh 'pip install -r requirements.txt' 
 
@@ -26,7 +26,7 @@ pipeline {
             }
             steps {
                 echo 'Iniciando el pipeline para el frontend de React...'
-                dir('frontend') {
+                dir('habit-tracker-frontend') {
                     // Instalar dependencias de Node.js
                     sh 'npm install'
                     // Compilar la aplicación para producción
