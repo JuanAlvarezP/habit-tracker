@@ -16,30 +16,30 @@ function App() {
 
   return (
     <Router>
-            <div className="min-h-screen w-full bg-background-dark">
-          <Routes>
-            <Route path="/register" element={<Register />} />
-            <Route
-              path="/login"
-              element={<Login setAuthToken={setAuthToken} />}
-            />
-            <Route
-              path="/habits"
-              element={authToken ? <HomePage /> : <Navigate to="/login" />}
-            />
-            <Route
-              path="/create-habit"
-              element={authToken ? <CreateHabit /> : <Navigate to="/login" />}
-            />
-            <Route
-              path="/edit-habit/:id"
-              element={authToken ? <EditHabit /> : <Navigate to="/login" />}
-            />
-            <Route
-              path="*"
-              element={<Navigate to={authToken ? "/habits" : "/login"} />}
-            />
-          </Routes>
+      <div className="min-h-screen w-full bg-background-dark">
+        <Routes>
+          <Route path="/register" element={<Register />} />
+          <Route
+            path="/login"
+            element={<Login setAuthToken={setAuthToken} />}
+          />
+          <Route
+            path="/habits"
+            element={authToken ? <HomePage /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/create-habit"
+            element={authToken ? <CreateHabit /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/edit-habit/:id"
+            element={authToken ? <EditHabit /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="*"
+            element={<Navigate to={authToken ? "/habits" : "/login"} />}
+          />
+        </Routes>
       </div>
     </Router>
   );

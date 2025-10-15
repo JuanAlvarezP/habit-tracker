@@ -10,7 +10,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  @apply bg-background-light dark:bg-background-dark;
+  @apply bg-background-dark;
 }
 
 code {
@@ -24,16 +24,16 @@ code {
 }
 
 .btn-secondary {
-  @apply bg-subtle-light hover:bg-opacity-90 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  @apply bg-subtle-dark hover:bg-opacity-90 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
 }
 
 .input-field {
-  @apply w-full px-3 py-2 border border-input-light dark:border-input-dark rounded-lg 
+  @apply w-full px-3 py-2 border border-input-dark rounded-lg 
          focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
-         bg-background-light dark:bg-background-dark
-         text-foreground-light dark:text-foreground-dark;
+         bg-background-dark
+         text-foreground-dark;
 }
 
 .card {
-  @apply bg-card-light dark:bg-card-dark rounded-lg shadow-md p-6;
+  @apply bg-card-dark rounded-lg shadow-md p-6;
 }

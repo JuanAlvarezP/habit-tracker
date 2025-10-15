@@ -27,4 +27,4 @@ class HabitDailyLog(models.Model):
         unique_together = ('habit', 'date')
 
     def __str__(self):
-        return f"{self.habit.name} on {self.date}: {'Completed' if self.completed else 'Not Completed'}"
+        return f"{self.habit.name} on {self.date}: {'Completed' if self.is_completed else 'Not Completed'}"

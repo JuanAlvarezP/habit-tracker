@@ -59,10 +59,17 @@ const HomePage = () => {
       <Navbar handleLogout={handleLogout} />
       <main className="flex-1 w-full">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-bold text-content-dark text-white">
-              Mis Hábitos
-            </h2>
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-white">Mis Hábitos</h2>
+              {habits.length > 0 && (
+                <p className="text-gray-400 text-sm mt-1">
+                  Tu progreso de hoy:{" "}
+                  {habits.filter((habit) => habit.is_completed).length}/
+                  {habits.length} hábitos completados
+                </p>
+              )}
+            </div>
             <Link
               to="/create-habit"
               className="inline-flex items-center px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-colors"
@@ -85,7 +92,7 @@ const HomePage = () => {
             </Link>
           </div>
 
-          {error && <p className="text-red-400 text-center">{error}</p>}
+          {error && <p className="text-red-400 text-center mb-6">{error}</p>}
 
           {habits.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -99,6 +106,9 @@ const HomePage = () => {
                         h.id === updatedHabit.id ? updatedHabit : h
                       )
                     );
+                  }}
+                  onHabitDelete={(deletedHabitId) => {
+                    setHabits(habits.filter((h) => h.id !== deletedHabitId));
                   }}
                 />
               ))}
@@ -120,7 +130,7 @@ const HomePage = () => {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-content-dark mb-2">
+              <h3 className="text-gray-300 text-lg font-medium text-content-dark mb-2">
                 No hay hábitos todavía
               </h3>
               <p className="text-subtle-dark mb-6">

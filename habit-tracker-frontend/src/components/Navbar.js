@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 
 const Navbar = ({ handleLogout }) => {
   return (
-    // Usa tus clases de color personalizadas
     <nav className="w-full bg-card-dark shadow-md">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
