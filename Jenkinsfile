@@ -252,7 +252,7 @@ PY
                         def githubRepoOwner = 'JuanAlvarezP'
                         def githubRepoName = 'habit-tracker'
                         
-                        withCredentials([string(credentialsId: 'github-token', variable: 'GH_TOKEN')]) {
+                        withCredentials([string(credentialsId: 'mi-git-token', variable: 'GH_TOKEN')]) {
                             githubToken = env.GH_TOKEN
                         }
                         
