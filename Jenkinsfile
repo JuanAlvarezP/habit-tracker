@@ -137,6 +137,10 @@ PY
                 pkill -f 'python.*manage.py runserver' || true
                 pkill -f 'node.*react-scripts' || true
                 
+                # IMPORTANTE: BUILD_ID=dontKillMe evita que Jenkins mate los procesos
+                JENKINS_NODE_COOKIE=dontKillMe
+                BUILD_ID=dontKillMe
+                
                 # Iniciar Django en background (puerto 8000)
                 . ${VENV_DIR}/bin/activate
                 export DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE}
@@ -145,17 +149,36 @@ PY
                 
                 # Iniciar React en background (puerto 3000)
                 cd habit-tracker-frontend
-                PORT=3000 nohup npm start > ../react_server.log 2>&1 &
+                BUILD_ID=dontKillMe JENKINS_NODE_COOKIE=dontKillMe PORT=3000 nohup npm start > ../react_server.log 2>&1 &
                 echo $! > ../react_server.pid
                 
-                sleep 5
+                sleep 8
                 
+                # Verificar que los servidores estén corriendo
+                if ps -p $(cat ../django_server.pid) > /dev/null 2>&1; then
+                    echo "✅ Django server iniciado correctamente (PID: $(cat ../django_server.pid))"
+                else
+                    echo "❌ Django server no se inició. Ver logs en django_server.log"
+                fi
+                
+                if ps -p $(cat ../react_server.pid) > /dev/null 2>&1; then
+                    echo "✅ React server iniciado correctamente (PID: $(cat ../react_server.pid))"
+                else
+                    echo "❌ React server no se inició. Ver logs en react_server.log"
+                fi
+                
+                cd ..
+                
+                echo ""
                 echo "✅ Servidores iniciados:"
                 echo "   - Backend (Django): http://localhost:8000"
                 echo "   - Frontend (React): http://localhost:3000"
                 echo ""
+                echo "📋 PIDs guardados en: django_server.pid y react_server.pid"
+                echo ""
                 echo "Para detener los servidores:"
-                echo "   kill \\$(cat django_server.pid) \\$(cat react_server.pid)"
+                echo "   ./scripts/stop_local_servers.sh"
+                echo "   O manualmente: kill \\$(cat django_server.pid) \\$(cat react_server.pid)"
                 echo ""
                 echo "Logs disponibles en: django_server.log y react_server.log"
                 '''
