@@ -225,42 +225,44 @@ PY
     post {
         always {
             script {
-                // Notificar a GitHub sobre el resultado del build
-                def commitSha = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                def buildStatus = currentBuild.result ?: 'SUCCESS'
-                def state = buildStatus == 'SUCCESS' ? 'success' : 'failure'
-                def description = buildStatus == 'SUCCESS' ? 
-                    '✅ Pipeline completado exitosamente' : 
-                    '❌ Pipeline falló - revisar logs'
-                
-                // Llamada a GitHub Status API
-                sh """
-                    curl -X POST \
-                      -H "Authorization: token ${GITHUB_TOKEN}" \
-                      -H "Accept: application/vnd.github.v3+json" \
-                      https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/statuses/${commitSha} \
-                      -d '{
-                        "state": "${state}",
-                        "target_url": "${BUILD_URL}",
-                        "description": "${description}",
-                        "context": "Jenkins CI/CD Pipeline"
-                      }'
-                """
-                
-                echo "📢 Notificación enviada a GitHub para commit ${commitSha}"
-                echo "   Estado: ${state}"
-                echo "   Descripción: ${description}"
+                node {
+                    // Notificar a GitHub sobre el resultado del build
+                    def commitSha = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    def buildStatus = currentBuild.result ?: 'SUCCESS'
+                    def state = buildStatus == 'SUCCESS' ? 'success' : 'failure'
+                    def description = buildStatus == 'SUCCESS' ? 
+                        '✅ Pipeline completado exitosamente' : 
+                        '❌ Pipeline falló - revisar logs'
+                    
+                    // Llamada a GitHub Status API
+                    sh """
+                        curl -X POST \
+                          -H "Authorization: token ${GITHUB_TOKEN}" \
+                          -H "Accept: application/vnd.github.v3+json" \
+                          https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/statuses/${commitSha} \
+                          -d '{
+                            "state": "${state}",
+                            "target_url": "${BUILD_URL}",
+                            "description": "${description}",
+                            "context": "Jenkins CI/CD Pipeline"
+                          }'
+                    """
+                    
+                    echo "📢 Notificación enviada a GitHub para commit ${commitSha}"
+                    echo "   Estado: ${state}"
+                    echo "   Descripción: ${description}"
+                    
+                    // Guardar artefactos de coverage y logs
+                    echo "Guardando artefactos locales"
+                    sh 'mkdir -p artifacts || true'
+                    sh 'cp -r coverage.* artifacts/ 2>/dev/null || true'
+                    sh 'cp -r gunicorn.log artifacts/ 2>/dev/null || true'
+                    sh "echo 'Resultado del build: ' ${currentBuild.result} > artifacts/build_status.txt || true"
+                    
+                    // Archivar artefactos en Jenkins
+                    archiveArtifacts artifacts: 'artifacts/**/*', allowEmptyArchive: true
+                }
             }
-            
-            // Guardar artefactos de coverage y logs
-            echo "Guardando artefactos locales"
-            sh 'mkdir -p artifacts || true'
-            sh 'cp -r coverage.* artifacts/ 2>/dev/null || true'
-            sh 'cp -r gunicorn.log artifacts/ 2>/dev/null || true'
-            sh "echo 'Resultado del build: ' ${currentBuild.result} > artifacts/build_status.txt || true"
-            
-            // Archivar artefactos en Jenkins
-            archiveArtifacts artifacts: 'artifacts/**/*', allowEmptyArchive: true
         }
         success {
             echo '✅ Pipeline completado correctamente'
