@@ -1,0 +1,14 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "watchPatterns": ["**/*.py", "**/*.js", "**/*.jsx", "**/*.css"]
+  },
+  "deploy": {
+    "startCommand": "gunicorn habit_tracker_backend.wsgi",
+    "healthcheckPath": "/",
+    "healthcheckTimeout": 60,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 5
+  }
+}
