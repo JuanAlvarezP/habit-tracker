@@ -6,9 +6,45 @@ pipeline {
         DJANGO_SETTINGS_MODULE = 'habit_tracker_backend.settings'
         PYTHONUNBUFFERED = '1'
         VENV_DIR = "venv"
+        
+        // GitHub configuration for notifications
+        GITHUB_TOKEN = credentials('github-token')
+        GITHUB_REPO_OWNER = 'JuanAlvarezP'
+        GITHUB_REPO_NAME = 'habit-tracker'
+    }
+    
+    options {
+        // Mantener solo los últimos 10 builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        // Timestamps en los logs
+        timestamps()
     }
 
     stages {
+        stage('Notify Start') {
+            steps {
+                script {
+                    def commitSha = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    
+                    // Notificar a GitHub que el build comenzó
+                    sh """
+                        curl -X POST \
+                          -H "Authorization: token ${GITHUB_TOKEN}" \
+                          -H "Accept: application/vnd.github.v3+json" \
+                          https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/statuses/${commitSha} \
+                          -d '{
+                            "state": "pending",
+                            "target_url": "${BUILD_URL}",
+                            "description": "⏳ Pipeline en ejecución...",
+                            "context": "Jenkins CI/CD Pipeline"
+                          }'
+                    """
+                    
+                    echo "📢 Notificación enviada a GitHub: Pipeline iniciado"
+                }
+            }
+        }
+        
         stage('Checkout') {
             steps {
                 echo '>> Checkout del repositorio'
@@ -188,18 +224,59 @@ PY
 
     post {
         always {
+            script {
+                // Notificar a GitHub sobre el resultado del build
+                def commitSha = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                def buildStatus = currentBuild.result ?: 'SUCCESS'
+                def state = buildStatus == 'SUCCESS' ? 'success' : 'failure'
+                def description = buildStatus == 'SUCCESS' ? 
+                    '✅ Pipeline completado exitosamente' : 
+                    '❌ Pipeline falló - revisar logs'
+                
+                // Llamada a GitHub Status API
+                sh """
+                    curl -X POST \
+                      -H "Authorization: token ${GITHUB_TOKEN}" \
+                      -H "Accept: application/vnd.github.v3+json" \
+                      https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/statuses/${commitSha} \
+                      -d '{
+                        "state": "${state}",
+                        "target_url": "${BUILD_URL}",
+                        "description": "${description}",
+                        "context": "Jenkins CI/CD Pipeline"
+                      }'
+                """
+                
+                echo "📢 Notificación enviada a GitHub para commit ${commitSha}"
+                echo "   Estado: ${state}"
+                echo "   Descripción: ${description}"
+            }
+            
             // Guardar artefactos de coverage y logs
             echo "Guardando artefactos locales"
             sh 'mkdir -p artifacts || true'
             sh 'cp -r coverage.* artifacts/ 2>/dev/null || true'
             sh 'cp -r gunicorn.log artifacts/ 2>/dev/null || true'
             sh "echo 'Resultado del build: ' ${currentBuild.result} > artifacts/build_status.txt || true"
+            
+            // Archivar artefactos en Jenkins
+            archiveArtifacts artifacts: 'artifacts/**/*', allowEmptyArchive: true
         }
         success {
-            echo 'Pipeline completado correctamente. ✅'
+            echo '✅ Pipeline completado correctamente'
+            echo '🎉 Todos los tests pasaron'
+            echo '📦 Artefactos generados exitosamente'
+            echo '🚀 Servidores desplegados en:'
+            echo '   - Backend:  http://localhost:8000'
+            echo '   - Frontend: http://localhost:3000'
         }
         failure {
-            echo 'Pipeline finalizó con errores. ❌'
+            echo '❌ Pipeline finalizó con errores'
+            echo '🔍 Revisar logs para más detalles'
+            echo '📄 Logs disponibles en Jenkins y en archivos locales'
+        }
+        unstable {
+            echo '⚠️  Pipeline inestable - algunos tests pueden haber fallado'
         }
     }
 }
