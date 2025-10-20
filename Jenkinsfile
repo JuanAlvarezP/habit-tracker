@@ -128,6 +128,39 @@ PY
                 '''
             }
         }
+
+        stage('Start Local Servers') {
+            steps {
+                echo '>> INICIANDO SERVIDORES LOCALES (Backend en 8000, Frontend en 3000)'
+                sh '''
+                # Detener procesos previos si existen
+                pkill -f 'python.*manage.py runserver' || true
+                pkill -f 'node.*react-scripts' || true
+                
+                # Iniciar Django en background (puerto 8000)
+                . ${VENV_DIR}/bin/activate
+                export DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE}
+                nohup python manage.py runserver 0.0.0.0:8000 > django_server.log 2>&1 &
+                echo $! > django_server.pid
+                
+                # Iniciar React en background (puerto 3000)
+                cd habit-tracker-frontend
+                PORT=3000 nohup npm start > ../react_server.log 2>&1 &
+                echo $! > ../react_server.pid
+                
+                sleep 5
+                
+                echo "✅ Servidores iniciados:"
+                echo "   - Backend (Django): http://localhost:8000"
+                echo "   - Frontend (React): http://localhost:3000"
+                echo ""
+                echo "Para detener los servidores:"
+                echo "   kill \\$(cat django_server.pid) \\$(cat react_server.pid)"
+                echo ""
+                echo "Logs disponibles en: django_server.log y react_server.log"
+                '''
+            }
+        }
     }
 
     post {
