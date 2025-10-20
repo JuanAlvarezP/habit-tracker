@@ -6,11 +6,6 @@ pipeline {
         DJANGO_SETTINGS_MODULE = 'habit_tracker_backend.settings'
         PYTHONUNBUFFERED = '1'
         VENV_DIR = "venv"
-        
-        // GitHub configuration for notifications
-        GITHUB_TOKEN = credentials('github-token')
-        GITHUB_REPO_OWNER = 'JuanAlvarezP'
-        GITHUB_REPO_NAME = 'habit-tracker'
     }
     
     options {
@@ -24,23 +19,30 @@ pipeline {
         stage('Notify Start') {
             steps {
                 script {
-                    def commitSha = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                    
-                    // Notificar a GitHub que el build comenzó
-                    sh """
-                        curl -X POST \
-                          -H "Authorization: token ${GITHUB_TOKEN}" \
-                          -H "Accept: application/vnd.github.v3+json" \
-                          https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/statuses/${commitSha} \
-                          -d '{
-                            "state": "pending",
-                            "target_url": "${BUILD_URL}",
-                            "description": "⏳ Pipeline en ejecución...",
-                            "context": "Jenkins CI/CD Pipeline"
-                          }'
-                    """
-                    
-                    echo "📢 Notificación enviada a GitHub: Pipeline iniciado"
+                    try {
+                        def commitSha = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                        
+                        // Notificar a GitHub que el build comenzó
+                        withCredentials([string(credentialsId: 'github-token', variable: 'GH_TOKEN')]) {
+                            sh """
+                                curl -X POST \
+                                  -H "Authorization: token ${GH_TOKEN}" \
+                                  -H "Accept: application/vnd.github.v3+json" \
+                                  https://api.github.com/repos/JuanAlvarezP/habit-tracker/statuses/${commitSha} \
+                                  -d '{
+                                    "state": "pending",
+                                    "target_url": "${BUILD_URL}",
+                                    "description": "⏳ Pipeline en ejecución...",
+                                    "context": "Jenkins CI/CD Pipeline"
+                                  }'
+                            """
+                            
+                            echo "📢 Notificación enviada a GitHub: Pipeline iniciado"
+                        }
+                    } catch (Exception e) {
+                        echo "⚠️  No se pudo enviar notificación inicial a GitHub: ${e.message}"
+                        echo "   Pipeline continuará normalmente"
+                    }
                 }
             }
         }
@@ -226,41 +228,62 @@ PY
         always {
             script {
                 node {
-                    // Notificar a GitHub sobre el resultado del build
-                    def commitSha = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                    def buildStatus = currentBuild.result ?: 'SUCCESS'
-                    def state = buildStatus == 'SUCCESS' ? 'success' : 'failure'
-                    def description = buildStatus == 'SUCCESS' ? 
-                        '✅ Pipeline completado exitosamente' : 
-                        '❌ Pipeline falló - revisar logs'
-                    
-                    // Llamada a GitHub Status API
-                    sh """
-                        curl -X POST \
-                          -H "Authorization: token ${GITHUB_TOKEN}" \
-                          -H "Accept: application/vnd.github.v3+json" \
-                          https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/statuses/${commitSha} \
-                          -d '{
-                            "state": "${state}",
-                            "target_url": "${BUILD_URL}",
-                            "description": "${description}",
-                            "context": "Jenkins CI/CD Pipeline"
-                          }'
-                    """
-                    
-                    echo "📢 Notificación enviada a GitHub para commit ${commitSha}"
-                    echo "   Estado: ${state}"
-                    echo "   Descripción: ${description}"
-                    
                     // Guardar artefactos de coverage y logs
                     echo "Guardando artefactos locales"
                     sh 'mkdir -p artifacts || true'
                     sh 'cp -r coverage.* artifacts/ 2>/dev/null || true'
                     sh 'cp -r gunicorn.log artifacts/ 2>/dev/null || true'
-                    sh "echo 'Resultado del build: ' ${currentBuild.result} > artifacts/build_status.txt || true"
+                    sh "echo 'Resultado del build: ${currentBuild.result ?: 'SUCCESS'}' > artifacts/build_status.txt || true"
                     
                     // Archivar artefactos en Jenkins
                     archiveArtifacts artifacts: 'artifacts/**/*', allowEmptyArchive: true
+                    
+                    // Notificar a GitHub sobre el resultado del build (opcional)
+                    try {
+                        def commitSha = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                        def buildStatus = currentBuild.result ?: 'SUCCESS'
+                        def state = buildStatus == 'SUCCESS' ? 'success' : 'failure'
+                        def description = buildStatus == 'SUCCESS' ? 
+                            '✅ Pipeline completado exitosamente' : 
+                            '❌ Pipeline falló - revisar logs'
+                        
+                        // Verificar si el token de GitHub está configurado
+                        def githubToken = ''
+                        def githubRepoOwner = 'JuanAlvarezP'
+                        def githubRepoName = 'habit-tracker'
+                        
+                        withCredentials([string(credentialsId: 'github-token', variable: 'GH_TOKEN')]) {
+                            githubToken = env.GH_TOKEN
+                        }
+                        
+                        if (githubToken) {
+                            // Llamada a GitHub Status API
+                            sh """
+                                curl -X POST \
+                                  -H "Authorization: token ${githubToken}" \
+                                  -H "Accept: application/vnd.github.v3+json" \
+                                  https://api.github.com/repos/${githubRepoOwner}/${githubRepoName}/statuses/${commitSha} \
+                                  -d '{
+                                    "state": "${state}",
+                                    "target_url": "${BUILD_URL}",
+                                    "description": "${description}",
+                                    "context": "Jenkins CI/CD Pipeline"
+                                  }'
+                            """
+                            
+                            echo "📢 Notificación enviada a GitHub para commit ${commitSha}"
+                            echo "   Estado: ${state}"
+                            echo "   Descripción: ${description}"
+                        } else {
+                            echo "ℹ️  Token de GitHub no configurado - notificaciones deshabilitadas"
+                            echo "   Para habilitar, configura la credencial 'github-token' en Jenkins"
+                            echo "   Ver GITHUB_NOTIFICATIONS.md para más información"
+                        }
+                    } catch (Exception e) {
+                        echo "⚠️  No se pudo enviar notificación a GitHub: ${e.message}"
+                        echo "   Pipeline continuará normalmente"
+                        echo "   Para configurar notificaciones, ver GITHUB_NOTIFICATIONS.md"
+                    }
                 }
             }
         }
