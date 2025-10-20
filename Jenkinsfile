@@ -50,7 +50,7 @@ pipeline {
 
         stage('Frontend CI: Install, Lint, Tests y Build') {
             tools {
-                nodejs 'node18' // nombre de la instalación en Jenkins (ajustar si es distinto)
+                nodejs 'Node.js 18' // nombre de la instalación en Jenkins (ajustar si es distinto)
             }
             steps {
                 echo '>> FRONTEND: Instalación, Linter, Pruebas y Build (React)'
