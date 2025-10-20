@@ -23,7 +23,7 @@ pipeline {
                         def commitSha = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                         
                         // Notificar a GitHub que el build comenzó
-                        withCredentials([string(credentialsId: 'github-token', variable: 'GH_TOKEN')]) {
+                        withCredentials([string(credentialsId: 'mi-git-token', variable: 'GH_TOKEN')]) {
                             sh """
                                 curl -X POST \
                                   -H "Authorization: token ${GH_TOKEN}" \
@@ -276,7 +276,7 @@ PY
                             echo "   Descripción: ${description}"
                         } else {
                             echo "ℹ️  Token de GitHub no configurado - notificaciones deshabilitadas"
-                            echo "   Para habilitar, configura la credencial 'github-token' en Jenkins"
+                            echo "   Para habilitar, configura la credencial 'mi-git-token' en Jenkins"
                             echo "   Ver GITHUB_NOTIFICATIONS.md para más información"
                         }
                     } catch (Exception e) {
