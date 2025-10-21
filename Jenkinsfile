@@ -23,7 +23,7 @@ pipeline {
                         def commitSha = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                         
                         // Notificar a GitHub que el build comenzó
-                        withCredentials([string(credentialsId: 'mi-git-token', variable: 'GH_TOKEN')]) {
+                        withCredentials([usernamePassword(credentialsId: 'mi-git-token', usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
                             sh """
                                 curl -X POST \
                                   -H "Authorization: token ${GH_TOKEN}" \
@@ -252,7 +252,7 @@ PY
                         def githubRepoOwner = 'JuanAlvarezP'
                         def githubRepoName = 'habit-tracker'
                         
-                        withCredentials([string(credentialsId: 'mi-git-token', variable: 'GH_TOKEN')]) {
+                        withCredentials([usernamePassword(credentialsId: 'mi-git-token', usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
                             githubToken = env.GH_TOKEN
                         }
                         
