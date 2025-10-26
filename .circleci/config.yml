@@ -13,8 +13,8 @@ jobs:
       PYTHONUNBUFFERED: "1"
       VENV_DIR: "venv"
       TARGET_DIR: "/tmp/habit-tracker-prod"
-      GITHUB_REPO_OWNER: "JuanAlvarezP"   # ajusta si es necesario
-      GITHUB_REPO_NAME: "habit-tracker"   # ajusta si es necesario
+      GITHUB_REPO_OWNER: "JuanAlvarezP"   
+      GITHUB_REPO_NAME: "habit-tracker"   
     steps:
       - checkout
 
@@ -215,7 +215,7 @@ jobs:
                 }" || true
             fi
 
-  # (Opcional) Job para emular "Start Local Servers"
+  #Job para emular "Start Local Servers"
   start_local_servers:
     docker:
       - image: cimg/python:3.11-node
@@ -281,4 +281,3 @@ workflows:
     jobs:
       - build_and_test:
           context: [github-notify]
-      # - start_local_servers   # descomenta si necesitas este job
