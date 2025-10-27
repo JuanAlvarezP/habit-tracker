@@ -135,7 +135,7 @@ jobs:
             . "${VENV_DIR}/bin/activate"
 
             # ¿Existe Django? -> entonces collectstatic y gunicorn
-            python - \<<'PY'
+            python - <<'PY'
             import importlib, sys
             try:
                 importlib.import_module('django')
@@ -149,7 +149,7 @@ jobs:
               ( python manage.py collectstatic --noinput || echo "collectstatic skipped" )
               pkill -f 'gunicorn' || true
 
-              APP_MODULE="$(python - \<<'PY'
+              APP_MODULE="$(python - <<'PY'
               import os
               m=os.environ.get("DJANGO_SETTINGS_MODULE","").replace(".settings","")
               print(f"{m}.wsgi:application" if m else "wsgi:application")
