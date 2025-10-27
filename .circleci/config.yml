@@ -128,7 +128,7 @@ jobs:
             fi
             echo "Artefactos listos en ${TARGET_DIR}"
 
-      # --- Smoke test con Gunicorn ---
+     # --- Smoke test con Gunicorn ---
       - run:
           name: "Smoke test Gunicorn (127.0.0.1:8001)"
           command: |
@@ -140,22 +140,19 @@ jobs:
             if [ "$?" -eq 0 ]; then
               echo "Django encontrado. Iniciando smoke test."
               export DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE}
-              ( python manage.py collectstatic --noinput || echo "collectstatic skipped" )
+              
+              # ( python manage.py collectstatic --noinput || echo "collectstatic skipped" ) # <--- LÍNEA COMENTADA
+              
               pkill -f 'gunicorn' || true # Limpieza previa
 
               APP_MODULE=$(python -c "import os; m=os.environ.get('DJANGO_SETTINGS_MODULE','').replace('.settings',''); print(f'{m}.wsgi:application' if m else 'wsgi:application')")
 
-              # --- CORRECCIÓN ---
-              # Reducimos los workers a 1. El error "terminated" suele ser
-              # por Out-of-Memory (OOM) al levantar 2 workers en un test.
               echo "Iniciando Gunicorn con 1 worker..."
               nohup "${VENV_DIR}/bin/gunicorn" --chdir . "${APP_MODULE}" -b 127.0.0.1:8001 --workers 1 > gunicorn.log 2>&1 &
               
               echo "Esperando 5 segundos a que Gunicorn inicie..."
-              sleep 5 # Damos un poco más de tiempo
+              sleep 5
 
-              # --- LÓGICA DE CURL MEJORADA ---
-              # Si curl falla, mostramos el log de gunicorn y fallamos el build
               if curl -f http://127.0.0.1:8001/; then
                 echo "Smoke test (curl) EXITOSO."
               else
