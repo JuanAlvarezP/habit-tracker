@@ -134,23 +134,39 @@ jobs:
           command: |
             . "${VENV_DIR}/bin/activate"
 
-            # ¿Existe Django? -> entonces collectstatic y gunicorn
-            # CORRECCIÓN: Usamos python -c para evitar problemas de here-document y YAML
+            # Verificar Django
             python -c "import importlib.util, sys; sys.exit(0) if importlib.util.find_spec('django') else sys.exit(1)"
 
             if [ "$?" -eq 0 ]; then
               echo "Django encontrado. Iniciando smoke test."
               export DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE}
               ( python manage.py collectstatic --noinput || echo "collectstatic skipped" )
-              pkill -f 'gunicorn' || true
+              pkill -f 'gunicorn' || true # Limpieza previa
 
-              # CORRECCIÓN: Usamos python -c también aquí
               APP_MODULE=$(python -c "import os; m=os.environ.get('DJANGO_SETTINGS_MODULE','').replace('.settings',''); print(f'{m}.wsgi:application' if m else 'wsgi:application')")
 
-              nohup "${VENV_DIR}/bin/gunicorn" --chdir . "${APP_MODULE}" -b 127.0.0.1:8001 --workers 2 > gunicorn.log 2>&1 &
-              sleep 3
-              curl -f http://127.0.0.1:8001/ || ( echo "Smoke test falló" && exit 1 ) || true
-              pkill -f 'gunicorn' || true
+              # --- CORRECCIÓN ---
+              # Reducimos los workers a 1. El error "terminated" suele ser
+              # por Out-of-Memory (OOM) al levantar 2 workers en un test.
+              echo "Iniciando Gunicorn con 1 worker..."
+              nohup "${VENV_DIR}/bin/gunicorn" --chdir . "${APP_MODULE}" -b 127.0.0.1:8001 --workers 1 > gunicorn.log 2>&1 &
+              
+              echo "Esperando 5 segundos a que Gunicorn inicie..."
+              sleep 5 # Damos un poco más de tiempo
+
+              # --- LÓGICA DE CURL MEJORADA ---
+              # Si curl falla, mostramos el log de gunicorn y fallamos el build
+              if curl -f http://127.0.0.1:8001/; then
+                echo "Smoke test (curl) EXITOSO."
+              else
+                echo "Smoke test (curl) FALLÓ."
+                echo "--- Mostrando log de Gunicorn (gunicorn.log) ---"
+                cat gunicorn.log
+                echo "--------------------------------------------------"
+                exit 1 # Falla el build
+              fi
+              
+              pkill -f 'gunicorn' || true # Limpieza final
             else
               echo "Django no disponible; se omite smoke test."
             fi
