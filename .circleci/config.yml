@@ -419,6 +419,10 @@ jobs:
           command: |
             . "${VENV_DIR}/bin/activate"
 
+            # Obtener IP del host para Docker
+            HOST_IP=$(hostname -I | awk '{print $1}')
+            echo "IP del host: $HOST_IP"
+
             # Iniciar Django
             echo "Iniciando Django en puerto 8000..."
             python manage.py runserver 0.0.0.0:8000 2>&1 | tee django.log &
@@ -509,8 +513,13 @@ jobs:
           name: "🎯 Ejecutar escaneo DAST con OWASP ZAP Docker"
           command: |
             mkdir -p ~/test-results/zap
+            chmod 777 ~/test-results/zap
 
             echo "Usando OWASP ZAP desde Docker..."
+
+            # Obtener IP del host
+            HOST_IP=$(hostname -I | awk '{print $1}')
+            echo "Usando IP del host: $HOST_IP"
 
             # Verificar que los servicios están corriendo
             echo "Re-verificando servicios antes del escaneo..."
@@ -519,12 +528,13 @@ jobs:
 
             # Escanear Frontend
             echo "=========================================="
-            echo "Escaneando Frontend en http://localhost:3000"
+            echo "Escaneando Frontend en http://$HOST_IP:3000"
             echo "=========================================="
-            docker run --rm --network host \
+            docker run --rm \
+              --add-host=host.docker.internal:$HOST_IP \
               -v ~/test-results/zap:/zap/wrk/:rw \
               zaproxy/zap-stable zap-baseline.py \
-              -t http://localhost:3000 \
+              -t http://host.docker.internal:3000 \
               -r zap-frontend-report.html \
               -I || echo "⚠️  Escaneo Frontend completado con alertas"
 
@@ -535,12 +545,13 @@ jobs:
             # Escanear API
             echo ""
             echo "=========================================="
-            echo "Escaneando API en http://localhost:8000/api/habits/"
+            echo "Escaneando API en http://$HOST_IP:8000/api/habits/"
             echo "=========================================="
-            docker run --rm --network host \
+            docker run --rm \
+              --add-host=host.docker.internal:$HOST_IP \
               -v ~/test-results/zap:/zap/wrk/:rw \
               zaproxy/zap-stable zap-baseline.py \
-              -t http://localhost:8000/api/habits/ \
+              -t http://host.docker.internal:8000/api/habits/ \
               -r zap-api-report.html \
               -I || echo "⚠️  Escaneo API completado con alertas"
 
