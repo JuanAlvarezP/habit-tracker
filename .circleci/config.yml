@@ -430,12 +430,14 @@ jobs:
           name: "📥 Instalar OWASP ZAP"
           command: |
             sudo apt-get update
-            sudo apt-get install -y wget default-jdk
+            sudo apt-get install -y wget openjdk-11-jre-headless
 
             cd /tmp
             wget -q https://github.com/zaproxy/zaproxy/releases/download/v2.14.0/ZAP_2.14.0_Linux.tar.gz
             tar -xzf ZAP_2.14.0_Linux.tar.gz
 
+            # Verificar instalación
+            java -version
             echo "✅ OWASP ZAP instalado"
 
       - run:
