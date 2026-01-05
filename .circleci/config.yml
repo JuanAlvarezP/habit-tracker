@@ -415,22 +415,69 @@ jobs:
 
       - run:
           name: "🚀 Iniciar aplicación"
-          background: true
           command: |
             . "${VENV_DIR}/bin/activate"
-            python manage.py runserver 0.0.0.0:8000 &
+
+            # Iniciar Django
+            echo "Iniciando Django en puerto 8000..."
+            python manage.py runserver 0.0.0.0:8000 > django.log 2>&1 &
+            DJANGO_PID=$!
+            echo "Django PID: $DJANGO_PID"
+
+            # Iniciar Frontend
+            echo "Iniciando Frontend en puerto 3000..."
             cd habit-tracker-frontend
-            npx serve -s build -l 3000 &
-            sleep 15
+            npx serve -s build -l 3000 > ../frontend.log 2>&1 &
+            FRONTEND_PID=$!
+            echo "Frontend PID: $FRONTEND_PID"
+            cd ..
+
+            # Esperar y verificar que estén corriendo
+            echo "Esperando 20 segundos a que los servicios inicien..."
+            sleep 20
+
+            # Verificar procesos
+            ps -p $DJANGO_PID || echo "⚠️  Django no está corriendo"
+            ps -p $FRONTEND_PID || echo "⚠️  Frontend no está corriendo"
+
+            # Intentar conexión múltiples veces
+            echo "Verificando conectividad..."
+            for i in {1..5}; do
+              if curl -s http://localhost:8000/ > /dev/null 2>&1; then
+                echo "✅ Django respondiendo"
+                break
+              fi
+              echo "Intento $i: Django no responde, esperando..."
+              sleep 3
+            done
+
+            for i in {1..5}; do
+              if curl -s http://localhost:3000/ > /dev/null 2>&1; then
+                echo "✅ Frontend respondiendo"
+                break
+              fi
+              echo "Intento $i: Frontend no responde, esperando..."
+              sleep 3
+            done
 
       - run:
           name: "🔍 Verificar servicios"
           command: |
-            echo "Verificando Backend..."
-            curl -f http://localhost:8000/ || echo "⚠️  Backend no responde"
+            echo "========================================="
+            echo "Verificación Final de Servicios"
+            echo "========================================="
 
-            echo "Verificando Frontend..."
-            curl -f http://localhost:3000/ || echo "⚠️  Frontend no responde"
+            echo "\nBackend (Django):" 
+            curl -I http://localhost:8000/ 2>&1 || echo "❌ Backend no responde"
+
+            echo "\nFrontend (React):"
+            curl -I http://localhost:3000/ 2>&1 || echo "❌ Frontend no responde"
+
+            echo "\nLogs de Django (últimas 20 líneas):"
+            tail -20 django.log 2>/dev/null || echo "No hay logs de Django"
+
+            echo "\nLogs de Frontend (últimas 20 líneas):"
+            tail -20 frontend.log 2>/dev/null || echo "No hay logs de Frontend"
 
       - run:
           name: "🎯 Ejecutar escaneo DAST con OWASP ZAP Docker"
@@ -450,7 +497,7 @@ jobs:
             echo "=========================================="
             docker run --rm --network host \
               -v ~/test-results/zap:/zap/wrk/:rw \
-              owasp/zap2docker-stable zap-baseline.py \
+              zaproxy/zap-stable zap-baseline.py \
               -t http://localhost:3000 \
               -r zap-frontend-report.html \
               -I || echo "⚠️  Escaneo Frontend completado con alertas"
@@ -466,7 +513,7 @@ jobs:
             echo "=========================================="
             docker run --rm --network host \
               -v ~/test-results/zap:/zap/wrk/:rw \
-              owasp/zap2docker-stable zap-baseline.py \
+              zaproxy/zap-stable zap-baseline.py \
               -t http://localhost:8000/api/habits/ \
               -r zap-api-report.html \
               -I || echo "⚠️  Escaneo API completado con alertas"
