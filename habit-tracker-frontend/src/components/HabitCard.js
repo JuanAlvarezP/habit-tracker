@@ -106,9 +106,9 @@ const HabitCard = ({ habit, onHabitUpdate, onHabitDelete }) => {
               ¿Eliminar hábito?
             </h3>
             <p className="text-gray-300 mb-6">
-              ¿Estás seguro de que quieres eliminar el hábito "{habit.name}"?
-              Esta acción no se puede deshacer y se perderán todos los datos
-              asociados.
+              ¿Estás seguro de que quieres eliminar el hábito &quot;{habit.name}
+              &quot;? Esta acción no se puede deshacer y se perderán todos los
+              datos asociados.
             </p>
             <div className="flex gap-3">
               <button
