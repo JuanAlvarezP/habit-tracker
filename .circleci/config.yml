@@ -468,8 +468,8 @@ jobs:
             echo "Verificando conectividad Backend..."
             DJANGO_OK=0
             for i in {1..10}; do
-              if curl -s http://localhost:8000/ > /dev/null 2>&1; then
-                echo "✅ Django respondiendo en http://localhost:8000/"
+              if curl -s http://localhost:8000/admin/ > /dev/null 2>&1; then
+                echo "✅ Django respondiendo en http://localhost:8000/admin/"
                 DJANGO_OK=1
                 break
               fi
@@ -515,7 +515,7 @@ jobs:
             # Verificar que los servicios están corriendo
             echo "Re-verificando servicios antes del escaneo..."
             curl -I http://localhost:3000 || echo "Frontend no responde"
-            curl -I http://localhost:8000 || echo "Backend no responde"
+            curl -I http://localhost:8000/admin/ || echo "Backend no responde"
 
             # Escanear Frontend
             echo "=========================================="
