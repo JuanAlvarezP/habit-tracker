@@ -363,8 +363,7 @@ jobs:
     steps:
       - checkout
 
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker
 
       - run:
           name: "📋 DAST - Análisis de Seguridad Dinámico"
