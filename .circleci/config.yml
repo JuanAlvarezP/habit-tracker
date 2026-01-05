@@ -495,4 +495,4 @@ workflows:
       - dast_owasp_zap:
           name: "🎯 DAST - Análisis Dinámico"
           requires:
-            - sast_eslint
+            - "🔍 SAST - Análisis Estático"
