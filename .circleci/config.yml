@@ -415,69 +415,95 @@ jobs:
 
       - run:
           name: "🚀 Iniciar aplicación"
+          background: true
           command: |
             . "${VENV_DIR}/bin/activate"
 
             # Iniciar Django
             echo "Iniciando Django en puerto 8000..."
-            python manage.py runserver 0.0.0.0:8000 > django.log 2>&1 &
-            DJANGO_PID=$!
-            echo "Django PID: $DJANGO_PID"
+            python manage.py runserver 0.0.0.0:8000 2>&1 | tee django.log &
+            echo $! > /tmp/django.pid
 
-            # Iniciar Frontend
+            # Iniciar Frontend  
             echo "Iniciando Frontend en puerto 3000..."
             cd habit-tracker-frontend
-            npx serve -s build -l 3000 > ../frontend.log 2>&1 &
-            FRONTEND_PID=$!
-            echo "Frontend PID: $FRONTEND_PID"
-            cd ..
+            npx serve -s build -l 3000 2>&1 | tee ../frontend.log &
+            echo $! > /tmp/frontend.pid
 
-            # Esperar y verificar que estén corriendo
-            echo "Esperando 20 segundos a que los servicios inicien..."
-            sleep 20
-
-            # Verificar procesos
-            ps -p $DJANGO_PID || echo "⚠️  Django no está corriendo"
-            ps -p $FRONTEND_PID || echo "⚠️  Frontend no está corriendo"
-
-            # Intentar conexión múltiples veces
-            echo "Verificando conectividad..."
-            for i in {1..5}; do
-              if curl -s http://localhost:8000/ > /dev/null 2>&1; then
-                echo "✅ Django respondiendo"
-                break
-              fi
-              echo "Intento $i: Django no responde, esperando..."
-              sleep 3
-            done
-
-            for i in {1..5}; do
-              if curl -s http://localhost:3000/ > /dev/null 2>&1; then
-                echo "✅ Frontend respondiendo"
-                break
-              fi
-              echo "Intento $i: Frontend no responde, esperando..."
-              sleep 3
-            done
+            # Mantener el proceso vivo
+            tail -f /dev/null
 
       - run:
           name: "🔍 Verificar servicios"
           command: |
             echo "========================================="
-            echo "Verificación Final de Servicios"
+            echo "Verificación de Servicios"
             echo "========================================="
 
-            echo "\nBackend (Django):" 
-            curl -I http://localhost:8000/ 2>&1 || echo "❌ Backend no responde"
+            # Esperar a que los servicios inicien
+            echo "Esperando 30 segundos a que los servicios inicien..."
+            sleep 30
 
-            echo "\nFrontend (React):"
-            curl -I http://localhost:3000/ 2>&1 || echo "❌ Frontend no responde"
+            # Verificar PIDs
+            if [ -f /tmp/django.pid ]; then
+              DJANGO_PID=$(cat /tmp/django.pid)
+              if ps -p $DJANGO_PID > /dev/null 2>&1; then
+                echo "✅ Django corriendo (PID: $DJANGO_PID)"
+              else
+                echo "❌ Django no está corriendo"
+              fi
+            fi
 
-            echo "\nLogs de Django (últimas 20 líneas):"
-            tail -20 django.log 2>/dev/null || echo "No hay logs de Django"
+            if [ -f /tmp/frontend.pid ]; then
+              FRONTEND_PID=$(cat /tmp/frontend.pid)
+              if ps -p $FRONTEND_PID > /dev/null 2>&1; then
+                echo "✅ Frontend corriendo (PID: $FRONTEND_PID)"
+              else
+                echo "❌ Frontend no está corriendo"
+              fi
+            fi
 
-            echo "\nLogs de Frontend (últimas 20 líneas):"
-            tail -20 frontend.log 2>/dev/null || echo "No hay logs de Frontend"
+            # Intentar conexión múltiples veces
+            echo ""
+            echo "Verificando conectividad Backend..."
+            DJANGO_OK=0
+            for i in {1..10}; do
+              if curl -s http://localhost:8000/ > /dev/null 2>&1; then
+                echo "✅ Django respondiendo en http://localhost:8000/"
+                DJANGO_OK=1
+                break
+              fi
+              echo "Intento $i/10: Django no responde, esperando..."
+              sleep 3
+            done
+
+            echo ""
+            echo "Verificando conectividad Frontend..."
+            FRONTEND_OK=0
+            for i in {1..10}; do
+              if curl -s http://localhost:3000/ > /dev/null 2>&1; then
+                echo "✅ Frontend respondiendo en http://localhost:3000/"
+                FRONTEND_OK=1
+                break
+              fi
+              echo "Intento $i/10: Frontend no responde, esperando..."
+              sleep 3
+            done
+
+            echo ""
+            echo "========================================="
+            echo "Resumen de Verificación"
+            echo "========================================="
+            echo "Django: $([ $DJANGO_OK -eq 1 ] && echo '✅ OK' || echo '❌ FAILED')"
+            echo "Frontend: $([ $FRONTEND_OK -eq 1 ] && echo '✅ OK' || echo '❌ FAILED')"
+
+            echo ""
+            echo "Logs de Django (últimas 30 líneas):"
+            tail -30 django.log 2>/dev/null || echo "No hay logs de Django"
+
+            echo ""
+            echo "Logs de Frontend (últimas 30 líneas):"
+            tail -30 frontend.log 2>/dev/null || echo "No hay logs de Frontend"
 
       - run:
           name: "🎯 Ejecutar escaneo DAST con OWASP ZAP Docker"
