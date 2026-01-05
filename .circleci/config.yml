@@ -234,8 +234,9 @@ jobs:
       - run:
           name: "🎯 Ejecutar escaneo DAST con OWASP ZAP Docker"
           command: |
-            mkdir -p ~/test-results/zap
-            chmod 777 ~/test-results/zap
+            # Crear directorio en el workspace
+            mkdir -p ~/project/zap-reports
+            chmod 777 ~/project/zap-reports
 
             echo "Usando OWASP ZAP desde Docker..."
 
@@ -254,7 +255,7 @@ jobs:
             echo "=========================================="
             docker run --rm \
               --add-host=host.docker.internal:$HOST_IP \
-              -v ~/test-results/zap:/zap/wrk/:rw \
+              -v ~/project/zap-reports:/zap/wrk/:rw \
               zaproxy/zap-stable zap-baseline.py \
               -t http://host.docker.internal:3000 \
               -r zap-frontend-report.html \
@@ -262,7 +263,7 @@ jobs:
 
             echo ""
             echo "Verificando reporte frontend..."
-            ls -lh ~/test-results/zap/zap-frontend-report.html || echo "❌ Reporte frontend NO generado"
+            ls -lh ~/project/zap-reports/zap-frontend-report.html || echo "❌ Reporte frontend NO generado"
 
             # Escanear API
             echo ""
@@ -271,7 +272,7 @@ jobs:
             echo "=========================================="
             docker run --rm \
               --add-host=host.docker.internal:$HOST_IP \
-              -v ~/test-results/zap:/zap/wrk/:rw \
+              -v ~/project/zap-reports:/zap/wrk/:rw \
               zaproxy/zap-stable zap-baseline.py \
               -t http://host.docker.internal:8000/api/habits/ \
               -r zap-api-report.html \
@@ -279,11 +280,11 @@ jobs:
 
             echo ""
             echo "Verificando reporte API..."
-            ls -lh ~/test-results/zap/zap-api-report.html || echo "❌ Reporte API NO generado"
+            ls -lh ~/project/zap-reports/zap-api-report.html || echo "❌ Reporte API NO generado"
 
             echo ""
             echo "Contenido del directorio de reportes:"
-            ls -la ~/test-results/zap/
+            ls -la ~/project/zap-reports/
 
       - run:
           name: "📊 Resumen de análisis DAST"
@@ -291,8 +292,7 @@ jobs:
             echo "=========================================="
             echo "📊 RESUMEN DE ANÁLISIS DINÁMICO (DAST)"
             echo "=========================================="
-
-            if [ -f ~/test-results/zap/zap-frontend-report.html ]; then
+project/zap-reports/zap-frontend-report.html ]; then
               echo "✅ Reporte DAST generado"
               echo ""
               echo "Reportes disponibles:"
@@ -302,6 +302,7 @@ jobs:
             echo "=========================================="
 
       - store_artifacts:
+          path: ~/project/zap-reports
           path: ~/test-results/zap
           destination: dast-reports
 
