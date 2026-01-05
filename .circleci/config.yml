@@ -363,12 +363,15 @@ jobs:
     steps:
       - checkout
 
+      - setup_remote_docker:
+          version: 20.10.14
+
       - run:
           name: "📋 DAST - Análisis de Seguridad Dinámico"
           command: |
             echo "=========================================="
             echo "🎯 DAST - Dynamic Application Security Testing"
-            echo "Herramienta: OWASP ZAP"
+            echo "Herramienta: OWASP ZAP (Docker)"
             echo "=========================================="
 
       - restore_cache:
@@ -427,47 +430,29 @@ jobs:
             curl -f http://localhost:3000/ || echo "⚠️  Frontend no responde"
 
       - run:
-          name: "📥 Instalar OWASP ZAP"
-          command: |
-            set +e  # No fallar por warnings
-
-            sudo apt-get update
-            sudo apt-get install -y wget openjdk-11-jre-headless ca-certificates-java 2>&1 | grep -v "warning:" || true
-
-            # Actualizar certificados (ignorar warnings)
-            sudo update-ca-certificates -f 2>&1 | grep -v "warning:" || true
-
-            set -e  # Volver a modo estricto
-
-            cd /tmp
-            wget -q https://github.com/zaproxy/zaproxy/releases/download/v2.14.0/ZAP_2.14.0_Linux.tar.gz
-            tar -xzf ZAP_2.14.0_Linux.tar.gz
-
-            # Verificar que Java funciona
-            if java -version 2>&1 | grep -q "openjdk"; then
-              echo "✅ Java instalado correctamente"
-            fi
-
-            echo "✅ OWASP ZAP instalado"
-
-      - run:
-          name: "🎯 Ejecutar escaneo DAST"
+          name: "🎯 Ejecutar escaneo DAST con OWASP ZAP Docker"
           command: |
             mkdir -p ~/test-results/zap
 
-            echo "Escaneando Frontend..."
-            /tmp/ZAP_2.14.0/zap.sh -cmd \
-              -quickurl http://localhost:3000 \
-              -quickprogress \
-              -quickout ~/test-results/zap/zap-frontend-report.html \
-              || echo "⚠️  Escaneo completado con alertas"
+            echo "Usando OWASP ZAP desde Docker..."
 
+            # Escanear Frontend
+            echo "Escaneando Frontend..."
+            docker run --rm --network host \
+              -v ~/test-results/zap:/zap/wrk/:rw \
+              owasp/zap2docker-stable zap-baseline.py \
+              -t http://localhost:3000 \
+              -r zap-frontend-report.html \
+              -I || echo "⚠️  Escaneo completado con alertas"
+
+            # Escanear API
             echo "Escaneando API..."
-            /tmp/ZAP_2.14.0/zap.sh -cmd \
-              -quickurl http://localhost:8000/api/habits/ \
-              -quickprogress \
-              -quickout ~/test-results/zap/zap-api-report.html \
-              || echo "⚠️  Escaneo API completado"
+            docker run --rm --network host \
+              -v ~/test-results/zap:/zap/wrk/:rw \
+              owasp/zap2docker-stable zap-baseline.py \
+              -t http://localhost:8000/api/habits/ \
+              -r zap-api-report.html \
+              -I || echo "⚠️  Escaneo API completado"
 
       - run:
           name: "📊 Resumen de análisis DAST"
