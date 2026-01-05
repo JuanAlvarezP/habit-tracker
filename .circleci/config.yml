@@ -439,23 +439,45 @@ jobs:
 
             echo "Usando OWASP ZAP desde Docker..."
 
+            # Verificar que los servicios están corriendo
+            echo "Re-verificando servicios antes del escaneo..."
+            curl -I http://localhost:3000 || echo "Frontend no responde"
+            curl -I http://localhost:8000 || echo "Backend no responde"
+
             # Escanear Frontend
-            echo "Escaneando Frontend..."
+            echo "=========================================="
+            echo "Escaneando Frontend en http://localhost:3000"
+            echo "=========================================="
             docker run --rm --network host \
               -v ~/test-results/zap:/zap/wrk/:rw \
               owasp/zap2docker-stable zap-baseline.py \
               -t http://localhost:3000 \
               -r zap-frontend-report.html \
-              -I || echo "⚠️  Escaneo completado con alertas"
+              -I || echo "⚠️  Escaneo Frontend completado con alertas"
+
+            echo ""
+            echo "Verificando reporte frontend..."
+            ls -lh ~/test-results/zap/zap-frontend-report.html || echo "❌ Reporte frontend NO generado"
 
             # Escanear API
-            echo "Escaneando API..."
+            echo ""
+            echo "=========================================="
+            echo "Escaneando API en http://localhost:8000/api/habits/"
+            echo "=========================================="
             docker run --rm --network host \
               -v ~/test-results/zap:/zap/wrk/:rw \
               owasp/zap2docker-stable zap-baseline.py \
               -t http://localhost:8000/api/habits/ \
               -r zap-api-report.html \
-              -I || echo "⚠️  Escaneo API completado"
+              -I || echo "⚠️  Escaneo API completado con alertas"
+
+            echo ""
+            echo "Verificando reporte API..."
+            ls -lh ~/test-results/zap/zap-api-report.html || echo "❌ Reporte API NO generado"
+
+            echo ""
+            echo "Contenido del directorio de reportes:"
+            ls -la ~/test-results/zap/
 
       - run:
           name: "📊 Resumen de análisis DAST"
