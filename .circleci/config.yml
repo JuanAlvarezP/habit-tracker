@@ -292,7 +292,8 @@ jobs:
             echo "=========================================="
             echo "📊 RESUMEN DE ANÁLISIS DINÁMICO (DAST)"
             echo "=========================================="
-project/zap-reports/zap-frontend-report.html ]; then
+
+            if [ -f ~/project/zap-reports/zap-frontend-report.html ]; then
               echo "✅ Reporte DAST generado"
               echo ""
               echo "Reportes disponibles:"
@@ -303,7 +304,6 @@ project/zap-reports/zap-frontend-report.html ]; then
 
       - store_artifacts:
           path: ~/project/zap-reports
-          path: ~/test-results/zap
           destination: dast-reports
 
 # ============================================
