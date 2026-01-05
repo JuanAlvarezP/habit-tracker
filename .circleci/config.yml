@@ -293,12 +293,15 @@ jobs:
             echo "📊 RESUMEN DE ANÁLISIS DINÁMICO (DAST)"
             echo "=========================================="
 
-            if [ -f ~/project/zap-reports/zap-frontend-report.html ]; then
-              echo "✅ Reporte DAST generado"
+            if [ -f ~/project/zap-reports/zap-frontend-scan.txt ]; then
+              echo "✅ Reportes DAST generados"
               echo ""
               echo "Reportes disponibles:"
-              echo "  - Frontend: zap-frontend-report.html"
-              echo "  - API: zap-api-report.html"
+              echo "  - Frontend: zap-frontend-scan.txt"
+              echo "  - API: zap-api-scan.txt"
+              echo ""
+              echo "Resumen de vulnerabilidades encontradas:"
+              grep -E "WARN-NEW:|FAIL-NEW:" ~/project/zap-reports/zap-frontend-scan.txt | head -20 || echo "Sin alertas críticas"
             fi
             echo "=========================================="
 
