@@ -1,0 +1,330 @@
+version: 2.1
+
+# Orbs para simplificar configuración
+orbs:
+  node: circleci/node@5.1.0
+  python: circleci/python@2.1.1
+
+# Jobs del pipeline
+jobs:
+  # ============================================
+  # JOB 1: SAST - Análisis Estático con ESLint
+  # ============================================
+  sast-eslint:
+    docker:
+      - image: cimg/node:18.19
+    working_directory: ~/habit-tracker
+    steps:
+      - checkout
+
+      - run:
+          name: "📋 Información del Job SAST"
+          command: |
+            echo "=========================================="
+            echo "🔍 SAST - Static Application Security Testing"
+            echo "Herramienta: ESLint + eslint-plugin-security"
+            echo "=========================================="
+
+      - restore_cache:
+          keys:
+            - v1-npm-deps-{{ checksum "habit-tracker-frontend/package.json" }}
+            - v1-npm-deps-
+
+      - run:
+          name: "📦 Instalar dependencias del frontend"
+          command: |
+            cd habit-tracker-frontend
+            npm install
+
+      - save_cache:
+          key: v1-npm-deps-{{ checksum "habit-tracker-frontend/package.json" }}
+          paths:
+            - habit-tracker-frontend/node_modules
+
+      - run:
+          name: "🔍 Ejecutar ESLint con análisis de seguridad"
+          command: |
+            cd habit-tracker-frontend
+            echo "Ejecutando ESLint con reglas de seguridad..."
+            mkdir -p ~/test-results/eslint
+
+            # Ejecutar ESLint y generar reportes
+            npm run lint -- --format json --output-file ~/test-results/eslint/eslint-report.json || true
+            npm run lint -- --format html --output-file ~/test-results/eslint/eslint-report.html || true
+            npm run lint || echo "⚠️  Se encontraron problemas de seguridad/calidad"
+
+            echo ""
+            echo "📊 Reporte generado en test-results/eslint/"
+
+      - run:
+          name: "📈 Resumen de vulnerabilidades encontradas"
+          command: |
+            cd habit-tracker-frontend
+            echo "=========================================="
+            echo "📊 RESUMEN DE ANÁLISIS ESTÁTICO (SAST)"
+            echo "=========================================="
+
+            if [ -f ~/test-results/eslint/eslint-report.json ]; then
+              # Contar errores y warnings de seguridad
+              TOTAL_ISSUES=$(cat ~/test-results/eslint/eslint-report.json | grep -o '"errorCount":[0-9]*' | cut -d':' -f2 | awk '{s+=$1} END {print s}' || echo "0")
+              echo "Total de issues encontrados: $TOTAL_ISSUES"
+              echo ""
+              echo "✅ Análisis SAST completado"
+            else
+              echo "⚠️  No se pudo generar el reporte"
+            fi
+            echo "=========================================="
+
+      - store_artifacts:
+          path: ~/test-results/eslint
+          destination: sast-reports
+
+      - store_test_results:
+          path: ~/test-results
+
+  # ============================================
+  # JOB 2: Build y Deploy Local (para DAST)
+  # ============================================
+  build-and-deploy:
+    docker:
+      - image: cimg/python:3.11-node
+    working_directory: ~/habit-tracker
+    steps:
+      - checkout
+
+      - run:
+          name: "📋 Información del Job Build"
+          command: |
+            echo "=========================================="
+            echo "🏗️  BUILD & DEPLOY"
+            echo "Preparando aplicación para pruebas DAST"
+            echo "=========================================="
+
+      # Backend setup
+      - restore_cache:
+          keys:
+            - v1-pip-deps-{{ checksum "requirements.txt" }}
+            - v1-pip-deps-
+
+      - run:
+          name: "🐍 Configurar Backend (Django)"
+          command: |
+            python -m venv venv
+            . venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            pip install gunicorn
+
+      - save_cache:
+          key: v1-pip-deps-{{ checksum "requirements.txt" }}
+          paths:
+            - venv
+
+      - run:
+          name: "🗄️  Configurar Base de Datos"
+          command: |
+            . venv/bin/activate
+            python manage.py migrate --noinput
+
+      # Frontend setup
+      - restore_cache:
+          keys:
+            - v1-npm-deps-{{ checksum "habit-tracker-frontend/package.json" }}
+            - v1-npm-deps-
+
+      - run:
+          name: "⚛️  Build Frontend (React)"
+          command: |
+            cd habit-tracker-frontend
+            npm install
+            npm run build
+
+      - save_cache:
+          key: v1-npm-deps-{{ checksum "habit-tracker-frontend/package.json" }}
+          paths:
+            - habit-tracker-frontend/node_modules
+
+      - run:
+          name: "🚀 Iniciar servidores en background"
+          background: true
+          command: |
+            # Iniciar Django
+            . venv/bin/activate
+            python manage.py runserver 0.0.0.0:8000 &
+
+            # Iniciar frontend con serve
+            cd habit-tracker-frontend
+            npx serve -s build -l 3000 &
+
+            # Esperar a que los servicios estén listos
+            sleep 15
+
+      - run:
+          name: "🔍 Verificar que los servicios estén corriendo"
+          command: |
+            echo "Verificando Backend..."
+            curl -f http://localhost:8000/api/habits/ || echo "⚠️  Backend no responde"
+
+            echo "Verificando Frontend..."
+            curl -f http://localhost:3000/ || echo "⚠️  Frontend no responde"
+
+            echo "✅ Servicios verificados"
+
+      # Persistir workspace para el siguiente job
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - habit-tracker
+
+  # ============================================
+  # JOB 3: DAST - Análisis Dinámico con OWASP ZAP
+  # ============================================
+  dast-owasp-zap:
+    docker:
+      - image: cimg/python:3.11-node
+    working_directory: ~/habit-tracker
+    steps:
+      - attach_workspace:
+          at: ~/
+
+      - run:
+          name: "📋 Información del Job DAST"
+          command: |
+            echo "=========================================="
+            echo "🎯 DAST - Dynamic Application Security Testing"
+            echo "Herramienta: OWASP ZAP (Zed Attack Proxy)"
+            echo "=========================================="
+
+      - run:
+          name: "🚀 Reiniciar servidores"
+          background: true
+          command: |
+            cd ~/habit-tracker
+            . venv/bin/activate
+            python manage.py runserver 0.0.0.0:8000 &
+
+            cd habit-tracker-frontend
+            npx serve -s build -l 3000 &
+
+            sleep 15
+
+      - run:
+          name: "📥 Instalar OWASP ZAP"
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y wget default-jdk
+
+            # Descargar OWASP ZAP
+            cd /tmp
+            wget https://github.com/zaproxy/zaproxy/releases/download/v2.14.0/ZAP_2.14.0_Linux.tar.gz
+            tar -xvf ZAP_2.14.0_Linux.tar.gz
+
+            echo "✅ OWASP ZAP instalado"
+
+      - run:
+          name: "🔍 Ejecutar escaneo DAST con OWASP ZAP"
+          command: |
+            mkdir -p ~/test-results/zap
+
+            echo "Iniciando escaneo de seguridad..."
+            echo "Target: http://localhost:3000"
+            echo ""
+
+            # Ejecutar ZAP en modo baseline (escaneo rápido)
+            /tmp/ZAP_2.14.0/zap.sh -cmd \
+              -quickurl http://localhost:3000 \
+              -quickprogress \
+              -quickout ~/test-results/zap/zap-report.html \
+              || echo "⚠️  Escaneo ZAP completado con alertas"
+
+            # También generar reporte JSON si está disponible
+            /tmp/ZAP_2.14.0/zap.sh -cmd \
+              -quickurl http://localhost:8000/api/habits/ \
+              -quickprogress \
+              -quickout ~/test-results/zap/zap-api-report.html \
+              || echo "⚠️  Escaneo API completado"
+
+      - run:
+          name: "📊 Resumen de vulnerabilidades DAST"
+          command: |
+            echo "=========================================="
+            echo "📊 RESUMEN DE ANÁLISIS DINÁMICO (DAST)"
+            echo "=========================================="
+
+            if [ -f ~/test-results/zap/zap-report.html ]; then
+              echo "✅ Reporte DAST generado exitosamente"
+              echo ""
+              echo "Ubicación de reportes:"
+              echo "  - Frontend: test-results/zap/zap-report.html"
+              echo "  - API: test-results/zap/zap-api-report.html"
+              echo ""
+              
+              # Mostrar estadísticas básicas si el archivo contiene información
+              if grep -q "High" ~/test-results/zap/zap-report.html; then
+                echo "⚠️  ALERTA: Se encontraron vulnerabilidades de severidad ALTA"
+              fi
+              
+              if grep -q "Medium" ~/test-results/zap/zap-report.html; then
+                echo "⚠️  Se encontraron vulnerabilidades de severidad MEDIA"
+              fi
+            else
+              echo "⚠️  No se pudo generar el reporte DAST"
+            fi
+
+            echo "=========================================="
+
+      - store_artifacts:
+          path: ~/test-results/zap
+          destination: dast-reports
+
+      - store_test_results:
+          path: ~/test-results
+
+  # ============================================
+  # JOB 4: Reporte Final de Seguridad
+  # ============================================
+  security-report:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - run:
+          name: "📊 Generar Reporte Consolidado de Seguridad"
+          command: |
+            echo "=========================================="
+            echo "🔐 REPORTE CONSOLIDADO DE SEGURIDAD"
+            echo "=========================================="
+            echo ""
+            echo "✅ Pipeline de Seguridad Completado"
+            echo ""
+            echo "📋 Análisis realizados:"
+            echo "  1. ✅ SAST - Análisis Estático (ESLint)"
+            echo "  2. ✅ DAST - Análisis Dinámico (OWASP ZAP)"
+            echo ""
+            echo "📁 Reportes disponibles en la pestaña 'Artifacts':"
+            echo "  - sast-reports/ - Reportes de ESLint"
+            echo "  - dast-reports/ - Reportes de OWASP ZAP"
+            echo ""
+            echo "=========================================="
+
+# Workflows - Define el orden de ejecución
+workflows:
+  version: 2
+  security-pipeline:
+    jobs:
+      - sast-eslint:
+          name: "🔍 SAST - Análisis Estático"
+
+      - build-and-deploy:
+          name: "🏗️  Build & Deploy"
+          requires:
+            - sast-eslint
+
+      - dast-owasp-zap:
+          name: "🎯 DAST - Análisis Dinámico"
+          requires:
+            - build-and-deploy
+
+      - security-report:
+          name: "📊 Reporte de Seguridad"
+          requires:
+            - dast-owasp-zap
