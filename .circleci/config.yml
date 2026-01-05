@@ -521,11 +521,6 @@ jobs:
             HOST_IP=$(hostname -I | awk '{print $1}')
             echo "Usando IP del host: $HOST_IP"
 
-            # Obtener UID y GID del usuario actual
-            USER_ID=$(id -u)
-            GROUP_ID=$(id -g)
-            echo "Usando usuario: $USER_ID:$GROUP_ID"
-
             # Verificar que los servicios están corriendo
             echo "Re-verificando servicios antes del escaneo..."
             curl -I http://localhost:3000 || echo "Frontend no responde"
@@ -537,7 +532,6 @@ jobs:
             echo "=========================================="
             docker run --rm \
               --add-host=host.docker.internal:$HOST_IP \
-              -u $USER_ID:$GROUP_ID \
               -v ~/test-results/zap:/zap/wrk/:rw \
               zaproxy/zap-stable zap-baseline.py \
               -t http://host.docker.internal:3000 \
@@ -555,7 +549,6 @@ jobs:
             echo "=========================================="
             docker run --rm \
               --add-host=host.docker.internal:$HOST_IP \
-              -u $USER_ID:$GROUP_ID \
               -v ~/test-results/zap:/zap/wrk/:rw \
               zaproxy/zap-stable zap-baseline.py \
               -t http://host.docker.internal:8000/api/habits/ \
