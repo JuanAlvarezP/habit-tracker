@@ -20,7 +20,7 @@
   "plugins": ["react", "react-hooks", "security"],
   "rules": {
     "react/react-in-jsx-scope": "off",
-    "react/prop-types": "warn",
+    "react/prop-types": "off",
 
     "security/detect-object-injection": "warn",
     "security/detect-non-literal-regexp": "warn",
