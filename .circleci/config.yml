@@ -430,17 +430,23 @@ jobs:
           name: "📥 Instalar OWASP ZAP"
           command: |
             sudo apt-get update
-            sudo apt-get install -y wget openjdk-11-jre-headless ca-certificates-java
+            sudo apt-get install -y wget openjdk-11-jre-headless
 
-            # Configurar certificados Java
-            sudo update-ca-certificates -f || true
+            # Reinstalar ca-certificates-java para asegurar configuración correcta
+            sudo apt-get install --reinstall -y ca-certificates-java
+
+            # Crear directorio si no existe
+            sudo mkdir -p /etc/ssl/certs/java
+
+            # Actualizar certificados CA
+            sudo update-ca-certificates -f
 
             cd /tmp
             wget -q https://github.com/zaproxy/zaproxy/releases/download/v2.14.0/ZAP_2.14.0_Linux.tar.gz
             tar -xzf ZAP_2.14.0_Linux.tar.gz
 
             # Verificar instalación
-            java -version 2>&1 || true
+            java -version 2>&1 | head -3 || true
             echo "✅ OWASP ZAP instalado"
 
       - run:
