@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from habits.views import HabitViewSet, DailyLogViewSet, UserRegistrationView
+from habits.views import HabitViewSet, DailyLogViewSet, UserRegistrationView, vulnerable_search, vulnerable_login
 from rest_framework.routers import DefaultRouter
 from rest_framework.authtoken.views import obtain_auth_token
 
@@ -29,4 +29,7 @@ urlpatterns = [
     path('api/register/', UserRegistrationView.as_view(), name='register'),
     path('api/login/', obtain_auth_token, name='login'), # Esta es una vista predefinida
     path("api/", include(router.urls)),
+    # ⚠️ Endpoints vulnerables para demostración de DAST
+    path('api/vulnerable-search/', vulnerable_search, name='vulnerable-search'),
+    path('api/vulnerable-login/', vulnerable_login, name='vulnerable-login'),
 ]
