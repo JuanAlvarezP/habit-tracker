@@ -114,51 +114,57 @@ jobs:
           sudo apt-get install -y sqlmap
 
           echo "✅ SQLMap instalado correctamente"
+          sqlmap --version
           echo ""
           echo "=========================================="
-          echo "🎯 Target 1: Vulnerable Search Endpoint"
+          echo "🎯 Target 1: Vulnerable Search by ID"
           echo "=========================================="
           echo ""
 
-          # Escanear endpoint VULNERABLE intencional
-          # Este endpoint tiene SQL injection por diseño
-          sqlmap -u "http://localhost:8000/api/vulnerable-search/?search=test" \
+          # Endpoint EXTREMADAMENTE vulnerable (GET con parámetro id)
+          # Configuración agresiva para garantizar detección
+          sqlmap -u "http://localhost:8000/api/vulnerable-search/?id=1" \
             --batch \
-            --level=2 \
-            --risk=2 \
-            -v 1 \
-            --random-agent || true
+            --level=5 \
+            --risk=3 \
+            --dbms=SQLite \
+            --technique=BEUSTQ \
+            --threads=5 \
+            --tamper=space2comment \
+            -v 3 \
+            --random-agent \
+            --flush-session || true
 
           echo ""
           echo "=========================================="
-          echo "🎯 Target 2: Vulnerable Login Endpoint"
+          echo "🎯 Target 2: Vulnerable User Search"
           echo "=========================================="
           echo ""
 
-          # Escanear login vulnerable
-          sqlmap -u "http://localhost:8000/api/vulnerable-login/" \
-            --data='{"username":"admin","password":"admin"}' \
-            --method=POST \
-            --headers="Content-Type: application/json" \
+          # Segundo endpoint vulnerable (GET con parámetro name)
+          sqlmap -u "http://localhost:8000/api/vulnerable-login/?name=admin" \
             --batch \
-            --level=2 \
-            --risk=2 \
-            -v 1 \
-            --random-agent || true
+            --level=5 \
+            --risk=3 \
+            --dbms=SQLite \
+            --technique=BEUSTQ \
+            --threads=5 \
+            -v 3 \
+            --random-agent \
+            --flush-session || true
 
           echo ""
           echo "=========================================="
-          echo "🎯 Target 3: Admin Login Page"
+          echo "🎯 Target 3: Habits API (protegido)"
           echo "=========================================="
           echo ""
 
-          # Escanear admin login
-          sqlmap -u "http://localhost:8000/admin/login/" \
-            --forms \
+          # Endpoint protegido para comparación
+          sqlmap -u "http://localhost:8000/api/habits/?id=1" \
             --batch \
-            --level=2 \
+            --level=3 \
             --risk=2 \
-            -v 1 \
+            -v 2 \
             --random-agent || true
 
       - name: 📊 Resumen Final

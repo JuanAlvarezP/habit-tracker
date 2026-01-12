@@ -108,64 +108,72 @@ class UserRegistrationView(APIView):
 def vulnerable_search(request):
     """
     Endpoint vulnerable a SQL injection para demostración de DAST.
-    Parámetro: search (busca hábitos por nombre)
-    Ejemplo: /api/vulnerable-search/?search=Ejercicio
+    Parámetro: id (busca hábito por ID)
+    Ejemplo: /api/vulnerable-search/?id=1
     
     ⚠️ SOLO PARA DEMO - NUNCA USAR EN PRODUCCIÓN
     """
-    search_term = request.GET.get('search', '')
+    habit_id = request.GET.get('id', '')
     
-    if not search_term:
-        return Response({'error': 'Parámetro search requerido'}, status=400)
+    if not habit_id:
+        return Response({'error': 'Parámetro id requerido'}, status=400)
     
-    # VULNERABILIDAD: Concatenación directa de entrada del usuario en SQL
-    # Esto permite inyecciones SQL como: ?search=1' OR '1'='1
-    query = f"SELECT id, name, description, frequency FROM habits_habit WHERE name LIKE '%{search_term}%'"
-    
-    with connection.cursor() as cursor:
-        cursor.execute(query)  # ⚠️ SQL INJECTION aquí
-        columns = [col[0] for col in cursor.description]
-        results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-    
-    return Response({
-        'results': results,
-        'count': len(results),
-        'search_term': search_term
-    })
-
-
-# ⚠️ OTRO ENDPOINT VULNERABLE - Login sin protección
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def vulnerable_login(request):
-    """
-    Endpoint de login vulnerable a SQL injection.
-    Envía: {"username": "admin", "password": "password"}
-    
-    ⚠️ SOLO PARA DEMO - NUNCA USAR EN PRODUCCIÓN
-    """
-    username = request.data.get('username', '')
-    password = request.data.get('password', '')
-    
-    if not username or not password:
-        return Response({'error': 'Username y password requeridos'}, status=400)
-    
-    # VULNERABILIDAD: Consulta SQL raw sin sanitización
-    query = f"SELECT id, username FROM auth_user WHERE username='{username}' AND password='{password}'"
+    # VULNERABILIDAD CRÍTICA: Concatenación directa sin validación
+    # Permite inyecciones SQL como: ?id=1 OR 1=1
+    query = f"SELECT id, name, description, frequency, user_id, created_at FROM habits_habit WHERE id = {habit_id}"
     
     with connection.cursor() as cursor:
         try:
-            cursor.execute(query)  # ⚠️ SQL INJECTION aquí
-            result = cursor.fetchone()
+            cursor.execute(query)  # ⚠️ SQL INJECTION CRÍTICA aquí
+            columns = [col[0] for col in cursor.description]
+            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
             
-            if result:
-                return Response({
-                    'success': True,
-                    'user_id': result[0],
-                    'username': result[1]
-                })
-            else:
-                return Response({'success': False, 'error': 'Credenciales inválidas'}, status=401)
+            return Response({
+                'success': True,
+                'results': results,
+                'count': len(results),
+                'query': query  # Muestra la query para que SQLMap vea el error
+            })
         except Exception as e:
-            return Response({'error': str(e)}, status=500)
+            return Response({
+                'error': str(e),
+                'query': query
+            }, status=500)
+
+
+# ⚠️ SEGUNDO ENDPOINT VULNERABLE - Búsqueda por nombre
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def vulnerable_login(request):
+    """
+    Endpoint vulnerable a SQL injection (GET con parámetro name).
+    Ejemplo: /api/vulnerable-login/?name=Juan
+    
+    ⚠️ SOLO PARA DEMO - NUNCA USAR EN PRODUCCIÓN
+    """
+    name = request.GET.get('name', '')
+    
+    if not name:
+        return Response({'error': 'Parámetro name requerido'}, status=400)
+    
+    # VULNERABILIDAD CRÍTICA: String concatenation sin escape
+    query = f"SELECT id, username, email, is_staff FROM auth_user WHERE username = '{name}'"
+    
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(query)  # ⚠️ SQL INJECTION CRÍTICA aquí
+            columns = [col[0] for col in cursor.description]
+            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            
+            return Response({
+                'success': True,
+                'results': results,
+                'count': len(results),
+                'query': query  # Expone la query vulnerable
+            })
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'query': query
+            }, status=500)
 
