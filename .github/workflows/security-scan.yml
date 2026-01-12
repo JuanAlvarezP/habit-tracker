@@ -1,0 +1,164 @@
+name: 🔒 Security Pipeline (SAST + DAST)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ============================================
+  # JOB 1: SAST - Análisis Estático con ESLint
+  # ============================================
+  sast-eslint:
+    name: 🔍 SAST - ESLint Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: habit-tracker-frontend/package.json
+
+      - name: 📋 Instalar dependencias
+        run: |
+          cd habit-tracker-frontend
+          npm install
+
+      - name: 🔍 Ejecutar ESLint con análisis de seguridad
+        run: |
+          cd habit-tracker-frontend
+          echo "=========================================="
+          echo "🔍 SAST - Static Application Security Testing"
+          echo "Herramienta: ESLint + eslint-plugin-security"
+          echo "=========================================="
+          echo ""
+
+          npm run lint || true
+
+          echo ""
+          echo "=========================================="
+          echo "📊 RESUMEN DEL ANÁLISIS SAST"
+          echo "=========================================="
+          echo "✅ Análisis completado"
+          echo "Los warnings mostrados arriba indican posibles vulnerabilidades"
+
+  # ============================================
+  # JOB 2: DAST - Análisis Dinámico con OWASP ZAP
+  # ============================================
+  dast-owasp-zap:
+    name: 🎯 DAST - OWASP ZAP Security Scan
+    runs-on: ubuntu-latest
+    needs: sast-eslint
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: habit-tracker-frontend/package.json
+
+      - name: 🔧 Configurar Backend Django
+        run: |
+          pip install -r requirements.txt
+          python manage.py migrate --noinput
+          echo "✅ Backend configurado"
+
+      - name: ⚛️  Build Frontend React
+        run: |
+          cd habit-tracker-frontend
+          npm install
+          npm run build
+          echo "✅ Frontend compilado"
+
+      - name: 🚀 Iniciar aplicaciones en background
+        run: |
+          # Iniciar Django
+          python manage.py runserver 0.0.0.0:8000 &
+          DJANGO_PID=$!
+          echo "Django PID: $DJANGO_PID"
+
+          # Iniciar Frontend
+          cd habit-tracker-frontend
+          npx serve -s build -l 3000 &
+          FRONTEND_PID=$!
+          echo "Frontend PID: $FRONTEND_PID"
+
+          # Esperar a que inicien
+          echo "Esperando 15 segundos a que los servicios inicien..."
+          sleep 15
+
+          # Verificar que están corriendo
+          curl -I http://localhost:3000 || echo "⚠️  Frontend no responde"
+          curl -I http://localhost:8000/admin/ || echo "⚠️  Backend no responde"
+
+      - name: 🎯 OWASP ZAP - Escanear Frontend
+        run: |
+          echo "=========================================="
+          echo "🎯 DAST - Dynamic Application Security Testing"
+          echo "Herramienta: OWASP ZAP Baseline Scan"
+          echo "Target: Frontend (http://localhost:3000)"
+          echo "=========================================="
+          echo ""
+
+          docker run --rm --network host \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t http://localhost:3000 \
+            -I || true
+
+          echo ""
+          echo "=========================================="
+          echo "✅ Escaneo Frontend completado"
+          echo "=========================================="
+
+      - name: 🎯 OWASP ZAP - Escanear Backend API
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "Target: Backend API (http://localhost:8000/api/habits/)"
+          echo "=========================================="
+          echo ""
+
+          docker run --rm --network host \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t http://localhost:8000/api/habits/ \
+            -I || true
+
+          echo ""
+          echo "=========================================="
+          echo "✅ Escaneo Backend completado"
+          echo "=========================================="
+
+      - name: 📊 Resumen Final
+        if: always()
+        run: |
+          echo ""
+          echo "========================================"
+          echo "📊 PIPELINE DE SEGURIDAD COMPLETADO"
+          echo "========================================"
+          echo ""
+          echo "✅ SAST (ESLint): Análisis estático completado"
+          echo "✅ DAST (OWASP ZAP): Análisis dinámico completado"
+          echo ""
+          echo "Revisa los logs arriba para ver las vulnerabilidades detectadas:"
+          echo "  - WARN-NEW: Vulnerabilidades nuevas encontradas"
+          echo "  - FAIL-NEW: Vulnerabilidades críticas"
+          echo "  - PASS: Pruebas de seguridad pasadas"
+          echo ""
+          echo "========================================"
