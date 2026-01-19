@@ -16,6 +16,9 @@ WORKDIR /app
 # Instalar dependencias del sistema
 RUN apt-get update && apt-get install -y \
     gcc \
+    pkg-config \
+    default-libmysqlclient-dev \
+    libmariadb-dev-compat \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
