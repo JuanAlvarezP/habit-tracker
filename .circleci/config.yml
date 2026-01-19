@@ -277,9 +277,9 @@ jobs:
           destination: dast-reports
 
   # ============================================
-  # JOB 5: BUILD DOCKER IMAGES
+  # JOB 5: BUILD DOCKER IMAGES Y SECURITY SCAN
   # ============================================
-  build_docker_images:
+  build_and_scan_docker_images:
     docker:
       - image: cimg/base:2024.01
     steps:
@@ -302,34 +302,6 @@ jobs:
             echo "✅ Frontend image built"
 
       - run:
-          name: "💾 Save Docker Images"
-          command: |
-            mkdir -p /tmp/docker-images
-            docker save -o /tmp/docker-images/backend.tar habit-tracker-backend:${CIRCLE_SHA1}
-            docker save -o /tmp/docker-images/frontend.tar habit-tracker-frontend:${CIRCLE_SHA1}
-
-      - store_artifacts:
-          path: /tmp/docker-images
-          destination: docker-images
-
-      - persist_to_workspace:
-          root: /tmp
-          paths:
-            - docker-images
-
-  # ============================================
-  # JOB 6: SECURITY SCAN DE IMÁGENES DOCKER
-  # ============================================
-  scan_docker_images:
-    docker:
-      - image: cimg/base:2024.01
-    steps:
-      - attach_workspace:
-          at: /tmp
-
-      - setup_remote_docker
-
-      - run:
           name: "🔍 Instalar Trivy"
           command: |
             wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
@@ -338,27 +310,35 @@ jobs:
             sudo apt-get install -y trivy
 
       - run:
-          name: "🔍 Cargar imágenes Docker"
-          command: |
-            docker load -i /tmp/docker-images/backend.tar
-            docker load -i /tmp/docker-images/frontend.tar
-
-      - run:
           name: "🔍 Escanear Backend con Trivy"
           command: |
             mkdir -p /tmp/trivy-reports
+            echo "Escaneando Backend..."
             trivy image --format json --output /tmp/trivy-reports/backend-scan.json habit-tracker-backend:${CIRCLE_SHA1} || true
-            trivy image habit-tracker-backend:${CIRCLE_SHA1} || true
+            trivy image --severity HIGH,CRITICAL habit-tracker-backend:${CIRCLE_SHA1} || true
 
       - run:
           name: "🔍 Escanear Frontend con Trivy"
           command: |
+            echo "Escaneando Frontend..."
             trivy image --format json --output /tmp/trivy-reports/frontend-scan.json habit-tracker-frontend:${CIRCLE_SHA1} || true
-            trivy image habit-tracker-frontend:${CIRCLE_SHA1} || true
+            trivy image --severity HIGH,CRITICAL habit-tracker-frontend:${CIRCLE_SHA1} || true
+
+      - run:
+          name: "💾 Save Docker Images (opcional)"
+          command: |
+            mkdir -p /tmp/docker-images
+            docker save -o /tmp/docker-images/backend.tar habit-tracker-backend:${CIRCLE_SHA1}
+            docker save -o /tmp/docker-images/frontend.tar habit-tracker-frontend:${CIRCLE_SHA1}
+            echo "✅ Images saved to artifacts"
 
       - store_artifacts:
           path: /tmp/trivy-reports
           destination: trivy-reports
+
+      - store_artifacts:
+          path: /tmp/docker-images
+          destination: docker-images
 
 # ============================================
 # WORKFLOWS
@@ -383,13 +363,8 @@ workflows:
             - build_backend
             - build_frontend
 
-      # Fase 3: Build de imágenes Docker
-      - build_docker_images:
+      # Fase 3: Build de imágenes Docker y security scan
+      - build_and_scan_docker_images:
           requires:
             - sast_eslint
             - dast_sqlmap
-
-      # Fase 4: Security scan de imágenes
-      - scan_docker_images:
-          requires:
-            - build_docker_images
