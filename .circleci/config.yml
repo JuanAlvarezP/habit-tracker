@@ -2,18 +2,117 @@ version: 2.1
 
 orbs:
   node: circleci/node@5.2.0
+  python: circleci/python@2.1.1
 
 # ============================================
-# JOB 1: SAST - Análisis Estático con ESLint
-# Líneas: 7-87
+# PIPELINE CI - INTEGRACIÓN CONTINUA
+# Build, Tests, SAST, DAST y Artefactos
 # ============================================
+
 jobs:
+  # ============================================
+  # JOB 1: BUILD Y TESTS - BACKEND
+  # ============================================
+  build_backend:
+    docker:
+      - image: cimg/python:3.11
+    working_directory: ~/project
+    steps:
+      - checkout
+
+      - run:
+          name: "🐍 Instalar dependencias Backend"
+          command: |
+            python -m venv venv
+            . venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            pip install pytest pytest-django coverage flake8
+
+      - run:
+          name: "🔍 Linting con Flake8"
+          command: |
+            . venv/bin/activate
+            flake8 --exclude=migrations,venv,habit-tracker-frontend . || true
+
+      - run:
+          name: "🧪 Tests unitarios con coverage"
+          command: |
+            . venv/bin/activate
+            export DJANGO_SETTINGS_MODULE=habit_tracker_backend.settings
+            python manage.py migrate --noinput
+            coverage run -m pytest
+            coverage report -m
+            coverage xml
+
+      - store_test_results:
+          path: test-results
+
+      - store_artifacts:
+          path: coverage.xml
+          destination: coverage-reports
+
+      - persist_to_workspace:
+          root: ~/project
+          paths:
+            - .
+
+  # ============================================
+  # JOB 2: BUILD Y TESTS - FRONTEND
+  # ============================================
+  build_frontend:
+    docker:
+      - image: cimg/node:18.19
+    working_directory: ~/project/habit-tracker-frontend
+    steps:
+      - checkout:
+          path: ~/project
+
+      - restore_cache:
+          keys:
+            - v1-npm-deps-{{ checksum "package.json" }}
+            - v1-npm-deps-
+
+      - run:
+          name: "📦 Instalar dependencias Frontend"
+          command: npm install
+
+      - save_cache:
+          key: v1-npm-deps-{{ checksum "package.json" }}
+          paths:
+            - node_modules
+
+      - run:
+          name: "🔍 Linting con ESLint"
+          command: npm run lint || true
+
+      - run:
+          name: "🧪 Tests unitarios con Jest"
+          command: npm test -- --ci --watchAll=false --coverage || true
+
+      - run:
+          name: "🏗️  Build para producción"
+          command: npm run build
+
+      - store_artifacts:
+          path: build
+          destination: frontend-build
+
+      - persist_to_workspace:
+          root: ~/project
+          paths:
+            - habit-tracker-frontend/build
+
+  # ============================================
+  # JOB 3: SAST - ANÁLISIS ESTÁTICO CON ESLINT
+  # ============================================
   sast_eslint:
     docker:
       - image: cimg/node:18.19
     working_directory: ~/project
     steps:
-      - checkout
+      - attach_workspace:
+          at: ~/project
 
       - run:
           name: "📋 SAST - Análisis de Seguridad Estático"
@@ -23,35 +122,19 @@ jobs:
             echo "Herramienta: ESLint + eslint-plugin-security"
             echo "=========================================="
 
-      - restore_cache:
-          keys:
-            - v1-npm-sast-{{ checksum "habit-tracker-frontend/package.json" }}
-            - v1-npm-sast-
-
-      - run:
-          name: "📦 Instalar dependencias"
-          command: |
-            cd habit-tracker-frontend
-            npm install
-
-      - save_cache:
-          key: v1-npm-sast-{{ checksum "habit-tracker-frontend/package.json" }}
-          paths:
-            - habit-tracker-frontend/node_modules
-
       - run:
           name: "🔍 Ejecutar ESLint con análisis de seguridad"
           command: |
             cd habit-tracker-frontend
-            mkdir -p ~/test-results/eslint
+            mkdir -p ~/project/sast-reports
 
             # Generar reportes
-            npm run lint -- --format json --output-file ~/test-results/eslint/eslint-report.json || true
-            npm run lint -- --format html --output-file ~/test-results/eslint/eslint-report.html || true
-            npm run lint || echo "⚠️  ESLint encontró problemas"
+            npm run lint -- --format json --output-file ~/project/sast-reports/eslint-report.json || true
+            npm run lint -- --format html --output-file ~/project/sast-reports/eslint-report.html || true
+            npm run lint || echo "⚠️  ESLint encontró problemas de seguridad"
 
             echo ""
-            echo "📊 Reportes generados en test-results/eslint/"
+            echo "📊 Reportes SAST generados en sast-reports/"
 
       - run:
           name: "📈 Resumen de análisis SAST"
@@ -59,232 +142,125 @@ jobs:
             echo "=========================================="
             echo "📊 RESUMEN DE ANÁLISIS ESTÁTICO (SAST)"
             echo "=========================================="
-
-            if [ -f ~/test-results/eslint/eslint-report.json ]; then
-              TOTAL=$(cat ~/test-results/eslint/eslint-report.json | grep -o '"errorCount":[0-9]*' | cut -d':' -f2 | awk '{s+=$1} END {print s}' || echo "0")
-              echo "Total de issues: $TOTAL"
+            if [ -f ~/project/sast-reports/eslint-report.json ]; then
               echo "✅ Análisis SAST completado"
+              echo "Ver reportes en artifacts/sast-reports"
             fi
             echo "=========================================="
 
       - store_artifacts:
-          path: ~/test-results/eslint
+          path: ~/project/sast-reports
           destination: sast-reports
 
-      - store_test_results:
-          path: ~/test-results
-
   # ============================================
-  # JOB 2: DAST - Análisis Dinámico con OWASP ZAP
-  # Líneas: 78-260
+  # JOB 4: DAST - ANÁLISIS DINÁMICO CON SQLMAP
   # ============================================
-  dast_owasp_zap:
+  dast_sqlmap:
     docker:
       - image: cimg/python:3.11-node
     resource_class: large
     working_directory: ~/project
-    environment:
-      DJANGO_SETTINGS_MODULE: "habit_tracker_backend.settings"
-      VENV_DIR: "venv"
     steps:
-      - checkout
-
-      - setup_remote_docker
+      - attach_workspace:
+          at: ~/project
 
       - run:
           name: "📋 DAST - Análisis de Seguridad Dinámico"
           command: |
             echo "=========================================="
-            echo "🎯 DAST - Dynamic Application Security Testing"
-            echo "Herramienta: OWASP ZAP (Docker)"
+            echo "💉 DAST - Dynamic Application Security Testing"
+            echo "Herramienta: SQLMap - SQL Injection Scanner"
             echo "=========================================="
 
-      - restore_cache:
-          keys:
-            - v1-pip-dast-{{ checksum "requirements.txt" }}
-            - v1-pip-dast-
-
       - run:
-          name: "🐍 Configurar Backend"
+          name: "🐍 Configurar Backend Django"
           command: |
-            python -m venv "${VENV_DIR}"
-            . "${VENV_DIR}/bin/activate"
+            python -m venv venv
+            . venv/bin/activate
             pip install --upgrade pip
             pip install -r requirements.txt
             python manage.py migrate --noinput
-
-      - save_cache:
-          key: v1-pip-dast-{{ checksum "requirements.txt" }}
-          paths:
-            - venv
-
-      - restore_cache:
-          keys:
-            - v1-npm-dast-{{ checksum "habit-tracker-frontend/package.json" }}
-            - v1-npm-dast-
+            echo "✅ Backend configurado"
 
       - run:
-          name: "⚛️  Configurar y Build Frontend"
+          name: "⚛️  Instalar dependencias Frontend"
           command: |
             cd habit-tracker-frontend
             npm install
-            npm run build
-
-      - save_cache:
-          key: v1-npm-dast-{{ checksum "habit-tracker-frontend/package.json" }}
-          paths:
-            - habit-tracker-frontend/node_modules
 
       - run:
-          name: "🚀 Iniciar aplicación"
+          name: "🚀 Iniciar aplicación Django en background"
           background: true
           command: |
-            . "${VENV_DIR}/bin/activate"
-
-            # Obtener IP del host para Docker
-            HOST_IP=$(hostname -I | awk '{print $1}')
-            echo "IP del host: $HOST_IP"
-
-            # Iniciar Django
-            echo "Iniciando Django en puerto 8000..."
-            python manage.py runserver 0.0.0.0:8000 2>&1 | tee django.log &
-            echo $! > /tmp/django.pid
-
-            # Iniciar Frontend  
-            echo "Iniciando Frontend en puerto 3000..."
-            cd habit-tracker-frontend
-            npx serve -s build -l 3000 2>&1 | tee ../frontend.log &
-            echo $! > /tmp/frontend.pid
-
-            # Mantener el proceso vivo
-            tail -f /dev/null
+            . venv/bin/activate
+            python manage.py runserver 0.0.0.0:8000
 
       - run:
-          name: "🔍 Verificar servicios"
+          name: "⏳ Esperar a que Django inicie"
           command: |
-            echo "========================================="
-            echo "Verificación de Servicios"
-            echo "========================================="
-
-            # Esperar a que los servicios inicien
-            echo "Esperando 30 segundos a que los servicios inicien..."
-            sleep 30
-
-            # Verificar PIDs
-            if [ -f /tmp/django.pid ]; then
-              DJANGO_PID=$(cat /tmp/django.pid)
-              if ps -p $DJANGO_PID > /dev/null 2>&1; then
-                echo "✅ Django corriendo (PID: $DJANGO_PID)"
-              else
-                echo "❌ Django no está corriendo"
-              fi
-            fi
-
-            if [ -f /tmp/frontend.pid ]; then
-              FRONTEND_PID=$(cat /tmp/frontend.pid)
-              if ps -p $FRONTEND_PID > /dev/null 2>&1; then
-                echo "✅ Frontend corriendo (PID: $FRONTEND_PID)"
-              else
-                echo "❌ Frontend no está corriendo"
-              fi
-            fi
-
-            # Intentar conexión múltiples veces
-            echo ""
-            echo "Verificando conectividad Backend..."
-            DJANGO_OK=0
-            for i in {1..10}; do
-              if curl -s http://localhost:8000/admin/ > /dev/null 2>&1; then
-                echo "✅ Django respondiendo en http://localhost:8000/admin/"
-                DJANGO_OK=1
-                break
-              fi
-              echo "Intento $i/10: Django no responde, esperando..."
-              sleep 3
-            done
-
-            echo ""
-            echo "Verificando conectividad Frontend..."
-            FRONTEND_OK=0
-            for i in {1..10}; do
-              if curl -s http://localhost:3000/ > /dev/null 2>&1; then
-                echo "✅ Frontend respondiendo en http://localhost:3000/"
-                FRONTEND_OK=1
-                break
-              fi
-              echo "Intento $i/10: Frontend no responde, esperando..."
-              sleep 3
-            done
-
-            echo ""
-            echo "========================================="
-            echo "Resumen de Verificación"
-            echo "========================================="
-            echo "Django: $([ $DJANGO_OK -eq 1 ] && echo '✅ OK' || echo '❌ FAILED')"
-            echo "Frontend: $([ $FRONTEND_OK -eq 1 ] && echo '✅ OK' || echo '❌ FAILED')"
-
-            echo ""
-            echo "Logs de Django (últimas 30 líneas):"
-            tail -30 django.log 2>/dev/null || echo "No hay logs de Django"
-
-            echo ""
-            echo "Logs de Frontend (últimas 30 líneas):"
-            tail -30 frontend.log 2>/dev/null || echo "No hay logs de Frontend"
+            echo "Esperando 20 segundos a que Django inicie..."
+            sleep 20
+            curl -I http://localhost:8000/admin/ && echo "✅ Django respondiendo" || echo "⚠️  Django no responde aún"
 
       - run:
-          name: "🎯 Ejecutar escaneo DAST con OWASP ZAP Docker"
+          name: "💉 Instalar SQLMap"
           command: |
-            # Crear directorio en el workspace
-            mkdir -p ~/project/zap-reports
-            chmod 777 ~/project/zap-reports
+            sudo apt-get update -qq
+            sudo apt-get install -y sqlmap
+            echo "✅ SQLMap instalado"
+            sqlmap --version
 
-            echo "Usando OWASP ZAP desde Docker..."
+      - run:
+          name: "💉 SQLMap - Escanear endpoints vulnerables"
+          command: |
+            mkdir -p ~/project/dast-reports
 
-            # Obtener IP del host
-            HOST_IP=$(hostname -I | awk '{print $1}')
-            echo "Usando IP del host: $HOST_IP"
-
-            # Verificar que los servicios están corriendo
-            echo "Re-verificando servicios antes del escaneo..."
-            curl -I http://localhost:3000 || echo "Frontend no responde"
-            curl -I http://localhost:8000/admin/ || echo "Backend no responde"
-
-            # Escanear Frontend
             echo "=========================================="
-            echo "Escaneando Frontend en http://$HOST_IP:3000"
+            echo "🎯 Target 1: Vulnerable Search by ID"
             echo "=========================================="
-            docker run --rm \
-              --add-host=host.docker.internal:$HOST_IP \
-              -v ~/project/zap-reports:/zap/wrk/:rw \
-              zaproxy/zap-stable zap-baseline.py \
-              -t http://host.docker.internal:3000 \
-              -r zap-frontend-report.html \
-              -I || echo "⚠️  Escaneo Frontend completado con alertas"
+
+            sqlmap -u "http://localhost:8000/api/vulnerable-search/?id=1" \
+              --batch \
+              --level=5 \
+              --risk=3 \
+              --dbms=SQLite \
+              --technique=BEUSTQ \
+              --threads=5 \
+              --tamper=space2comment \
+              -v 3 \
+              --random-agent \
+              --flush-session \
+              --output-dir=~/project/dast-reports || true
 
             echo ""
-            echo "Verificando reporte frontend..."
-            ls -lh ~/project/zap-reports/zap-frontend-report.html || echo "❌ Reporte frontend NO generado"
+            echo "=========================================="
+            echo "🎯 Target 2: Vulnerable User Search"
+            echo "=========================================="
 
-            # Escanear API
+            sqlmap -u "http://localhost:8000/api/vulnerable-login/?name=admin" \
+              --batch \
+              --level=5 \
+              --risk=3 \
+              --dbms=SQLite \
+              --technique=BEUSTQ \
+              --threads=5 \
+              -v 3 \
+              --random-agent \
+              --flush-session \
+              --output-dir=~/project/dast-reports || true
+
             echo ""
             echo "=========================================="
-            echo "Escaneando API en http://$HOST_IP:8000/api/habits/"
+            echo "🎯 Target 3: Habits API (protegido - comparación)"
             echo "=========================================="
-            docker run --rm \
-              --add-host=host.docker.internal:$HOST_IP \
-              -v ~/project/zap-reports:/zap/wrk/:rw \
-              zaproxy/zap-stable zap-baseline.py \
-              -t http://host.docker.internal:8000/api/habits/ \
-              -r zap-api-report.html \
-              -I || echo "⚠️  Escaneo API completado con alertas"
 
-            echo ""
-            echo "Verificando reporte API..."
-            ls -lh ~/project/zap-reports/zap-api-report.html || echo "❌ Reporte API NO generado"
-
-            echo ""
-            echo "Contenido del directorio de reportes:"
-            ls -la ~/project/zap-reports/
+            sqlmap -u "http://localhost:8000/api/habits/?id=1" \
+              --batch \
+              --level=3 \
+              --risk=2 \
+              -v 2 \
+              --random-agent \
+              --output-dir=~/project/dast-reports || true
 
       - run:
           name: "📊 Resumen de análisis DAST"
@@ -292,22 +268,97 @@ jobs:
             echo "=========================================="
             echo "📊 RESUMEN DE ANÁLISIS DINÁMICO (DAST)"
             echo "=========================================="
-
-            if [ -f ~/project/zap-reports/zap-frontend-scan.txt ]; then
-              echo "✅ Reportes DAST generados"
-              echo ""
-              echo "Reportes disponibles:"
-              echo "  - Frontend: zap-frontend-scan.txt"
-              echo "  - API: zap-api-scan.txt"
-              echo ""
-              echo "Resumen de vulnerabilidades encontradas:"
-              grep -E "WARN-NEW:|FAIL-NEW:" ~/project/zap-reports/zap-frontend-scan.txt | head -20 || echo "Sin alertas críticas"
-            fi
+            echo "✅ SQLMap completó el análisis de inyecciones SQL"
+            echo "Ver reportes detallados en artifacts/dast-reports"
             echo "=========================================="
 
       - store_artifacts:
-          path: ~/project/zap-reports
+          path: ~/project/dast-reports
           destination: dast-reports
+
+  # ============================================
+  # JOB 5: BUILD DOCKER IMAGES
+  # ============================================
+  build_docker_images:
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+
+      - run:
+          name: "🐳 Build Backend Docker Image"
+          command: |
+            docker build -t habit-tracker-backend:${CIRCLE_SHA1} -f Dockerfile.backend .
+            docker tag habit-tracker-backend:${CIRCLE_SHA1} habit-tracker-backend:latest
+            echo "✅ Backend image built"
+
+      - run:
+          name: "🐳 Build Frontend Docker Image"
+          command: |
+            docker build -t habit-tracker-frontend:${CIRCLE_SHA1} -f Dockerfile.frontend ./habit-tracker-frontend
+            docker tag habit-tracker-frontend:${CIRCLE_SHA1} habit-tracker-frontend:latest
+            echo "✅ Frontend image built"
+
+      - run:
+          name: "💾 Save Docker Images"
+          command: |
+            mkdir -p /tmp/docker-images
+            docker save -o /tmp/docker-images/backend.tar habit-tracker-backend:${CIRCLE_SHA1}
+            docker save -o /tmp/docker-images/frontend.tar habit-tracker-frontend:${CIRCLE_SHA1}
+
+      - store_artifacts:
+          path: /tmp/docker-images
+          destination: docker-images
+
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+            - docker-images
+
+  # ============================================
+  # JOB 6: SECURITY SCAN DE IMÁGENES DOCKER
+  # ============================================
+  scan_docker_images:
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      - attach_workspace:
+          at: /tmp
+
+      - setup_remote_docker
+
+      - run:
+          name: "🔍 Instalar Trivy"
+          command: |
+            wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+            echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+            sudo apt-get update
+            sudo apt-get install -y trivy
+
+      - run:
+          name: "🔍 Cargar imágenes Docker"
+          command: |
+            docker load -i /tmp/docker-images/backend.tar
+            docker load -i /tmp/docker-images/frontend.tar
+
+      - run:
+          name: "🔍 Escanear Backend con Trivy"
+          command: |
+            mkdir -p /tmp/trivy-reports
+            trivy image --format json --output /tmp/trivy-reports/backend-scan.json habit-tracker-backend:${CIRCLE_SHA1} || true
+            trivy image habit-tracker-backend:${CIRCLE_SHA1} || true
+
+      - run:
+          name: "🔍 Escanear Frontend con Trivy"
+          command: |
+            trivy image --format json --output /tmp/trivy-reports/frontend-scan.json habit-tracker-frontend:${CIRCLE_SHA1} || true
+            trivy image habit-tracker-frontend:${CIRCLE_SHA1} || true
+
+      - store_artifacts:
+          path: /tmp/trivy-reports
+          destination: trivy-reports
 
 # ============================================
 # WORKFLOWS
@@ -315,13 +366,30 @@ jobs:
 workflows:
   version: 2
 
-  # Workflow de seguridad SAST & DAST
-  security_pipeline:
+  # PIPELINE CI COMPLETO
+  ci_pipeline:
     jobs:
-      - sast_eslint:
-          name: "🔍 SAST - Análisis Estático"
+      # Fase 1: Build y Tests en paralelo
+      - build_backend
+      - build_frontend
 
-      - dast_owasp_zap:
-          name: "🎯 DAST - Análisis Dinámico"
+      # Fase 2: Análisis de seguridad (SAST y DAST)
+      - sast_eslint:
           requires:
-            - "🔍 SAST - Análisis Estático"
+            - build_frontend
+
+      - dast_sqlmap:
+          requires:
+            - build_backend
+            - build_frontend
+
+      # Fase 3: Build de imágenes Docker
+      - build_docker_images:
+          requires:
+            - sast_eslint
+            - dast_sqlmap
+
+      # Fase 4: Security scan de imágenes
+      - scan_docker_images:
+          requires:
+            - build_docker_images

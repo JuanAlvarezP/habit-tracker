@@ -1,0 +1,31 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow Latest Tag
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      No permite usar la etiqueta 'latest' en imágenes Docker.
+      Se debe especificar una versión específica.
+spec:
+  validationFailureAction: audit
+  background: true
+  rules:
+    - name: validate-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - habit-tracker
+      validate:
+        message: "No se permite usar la etiqueta 'latest' en imágenes"
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - image: "!*:latest"

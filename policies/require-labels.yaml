@@ -1,0 +1,32 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-labels
+  annotations:
+    policies.kyverno.io/title: Require Common Labels
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      Requiere que todos los recursos tengan las etiquetas estándar:
+      app, tier, environment
+spec:
+  validationFailureAction: audit
+  background: true
+  rules:
+    - name: check-for-labels
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - Service
+                - ConfigMap
+              namespaces:
+                - habit-tracker
+      validate:
+        message: "Las etiquetas 'app' y 'tier' son requeridas"
+        pattern:
+          metadata:
+            labels:
+              app: "?*"
+              tier: "?*"

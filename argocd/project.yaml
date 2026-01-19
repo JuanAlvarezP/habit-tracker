@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: habit-tracker-project
+  namespace: argocd
+spec:
+  description: "Proyecto Habit Tracker - CI/CD con DevSecOps"
+
+  # Repositorios permitidos
+  sourceRepos:
+    - https://github.com/JuanAlvarezP/habit-tracker.git
+
+  # Destinos permitidos
+  destinations:
+    - namespace: habit-tracker
+      server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+
+  # Recursos permitidos
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+
+  # Namespaces permitidos
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+
+  # Políticas de sincronización
+  syncWindows:
+    - kind: allow
+      schedule: "* * * * *"
+      duration: 24h
+      applications:
+        - "*"
