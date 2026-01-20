@@ -101,7 +101,7 @@ jobs:
       - persist_to_workspace:
           root: ~/project
           paths:
-            - habit-tracker-frontend/build
+            - habit-tracker-frontend
 
   # ============================================
   # JOB 3: SAST - ANÁLISIS ESTÁTICO CON ESLINT
