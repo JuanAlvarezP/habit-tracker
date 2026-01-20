@@ -122,6 +122,17 @@ jobs:
             echo "Herramienta: ESLint + eslint-plugin-security"
             echo "=========================================="
 
+      - restore_cache:
+          keys:
+            - v1-npm-deps-{{ checksum "habit-tracker-frontend/package.json" }}
+            - v1-npm-deps-
+
+      - run:
+          name: "📦 Instalar dependencias de Frontend"
+          command: |
+            cd habit-tracker-frontend
+            npm install
+
       - run:
           name: "🔍 Ejecutar ESLint con análisis de seguridad"
           command: |
