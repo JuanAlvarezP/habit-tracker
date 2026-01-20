@@ -16,9 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
 from habits.views import HabitViewSet, DailyLogViewSet, UserRegistrationView, vulnerable_search, vulnerable_login
 from rest_framework.routers import DefaultRouter
 from rest_framework.authtoken.views import obtain_auth_token
+
+def health_check(request):
+    """Health check endpoint for Kubernetes probes"""
+    return JsonResponse({"status": "healthy"}, status=200)
 
 router = DefaultRouter()
 router.register(r'habits', HabitViewSet, basename='habits')
@@ -26,6 +31,7 @@ router.register(r'dailylogs', DailyLogViewSet, basename='dailylogs')
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path('health/', health_check, name='health'),  # Health check endpoint
     path('api/register/', UserRegistrationView.as_view(), name='register'),
     path('api/login/', obtain_auth_token, name='login'), # Esta es una vista predefinida
     path("api/", include(router.urls)),
